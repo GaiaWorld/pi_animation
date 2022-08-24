@@ -333,7 +333,7 @@ mod test01 {
             targets.push(target);
         }
 
-        // 添加 100_000 动画组
+        // 添加 10 动画组 每组 10000 动画
         for i in 0..group_range {
             let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group(&mut type_animation_ctx_mgr.target_allocator);
             for j in 0..group_animation_range {
@@ -342,6 +342,7 @@ mod test01 {
             type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30);
         }
  
+        // 测试 动画性能 计 10w 个动画计算 & 10_000 个对象的数据修改
         b.iter(move || {
         
             type_animation_ctx_mgr.anime(1);

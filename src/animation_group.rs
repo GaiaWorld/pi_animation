@@ -1,4 +1,3 @@
-use nalgebra::ComplexField;
 use pi_curves::curve::{frame::KeyFrameCurveValue, FramePerSecond, FrameIndex};
 
 use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTargetAllocator}, frame_curve_manager::{FrameCurveInfoID, FrameCurveInfo}, animation::{AnimationID, self, AnimationManager, AnimationInfo}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, AnimatableFloat1};

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use pi_curves::curve::{FrameIndex, frame::{FrameDataValue, KeyFrameDataType}, frame_curve::FrameCurve, FramePerSecond};
-use pi_hash::XHashMap;
 
 use crate::error::EAnimationError;
 
