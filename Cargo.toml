@@ -9,6 +9,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["pi", "animation", "target animation", "attribute animation"]
 
 [dependencies]
+pi_slotmap = "0.1"
 # pi_curves = { git = "https://github.com/GaiaWorld/pi_animation"}
 pi_curves = { path = "../pi_curves"}
 log = "0.4"

@@ -37,7 +37,7 @@ impl RuntimeInfoMap {
         self.list.push(vec![]);
     }
     /// 动画运行时记录
-    pub fn record(
+    pub fn insert(
         &mut self,
         ty: KeyFrameDataType,
         info: RuntimeInfo,

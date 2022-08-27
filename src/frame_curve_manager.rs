@@ -6,6 +6,24 @@ use crate::error::EAnimationError;
 
 pub type FrameCurveInfoID = usize;
 
+pub trait TTypeFrameCurveInfoManager {
+    fn insert(&mut self, curve: FrameCurveInfo) -> FrameCurveInfoID;
+    fn remove(&mut self, id: FrameCurveInfoID) -> Result<(), EAnimationError>;
+    fn get(&self, id: FrameCurveInfoID) -> Result<FrameCurveInfo, EAnimationError>;
+}
+
+pub trait TFrameCurveInfoManager {
+    fn add_type(&mut self, ty: KeyFrameDataType) -> Result<(), EAnimationError>;
+    fn insert(&mut self, ty: KeyFrameDataType, curve: FrameCurveInfo) -> FrameCurveInfoID;
+    fn remove(&mut self, ty: KeyFrameDataType, id: FrameCurveInfoID) -> Result<(), EAnimationError>;
+    fn get(&self, ty: KeyFrameDataType, id: FrameCurveInfoID) -> Result<FrameCurveInfo, EAnimationError>;
+}
+
+pub trait TFrameCurvePool<T: FrameDataValue> {
+    fn insert(&mut self, id: FrameCurveInfoID, curve: FrameCurve<T>,);
+    fn remove(&mut self, id: FrameCurveInfoID) -> Result<(), EAnimationError>;
+    fn get(&self, id: FrameCurveInfoID) -> Result<Arc<FrameCurve<T>>, EAnimationError>;
+}
 
 /// 针对某种数据类型对应的帧曲线描述信息管理器
 /// * 每个曲线的 ID 一旦分配便不会变化
@@ -22,7 +40,10 @@ impl TypeFrameCurveInfoManager {
     pub fn default() -> Self {
         Self { id_pool: vec![], counter: 0, curve_infos: vec![] }
     }
-    pub fn add(
+}
+
+impl TTypeFrameCurveInfoManager for TypeFrameCurveInfoManager {
+    fn insert(
         &mut self,
         curve: FrameCurveInfo,
     ) -> FrameCurveInfoID {
@@ -46,7 +67,7 @@ impl TypeFrameCurveInfoManager {
 
         id
     }
-    pub fn del(
+    fn remove(
         &mut self,
         id: FrameCurveInfoID,
     ) -> Result<(), EAnimationError> {
@@ -60,7 +81,7 @@ impl TypeFrameCurveInfoManager {
             Err(EAnimationError::FrameCurveNotFound)
         }
     }
-    pub fn get(
+    fn get(
         &self,
         id: FrameCurveInfoID,
     ) -> Result<FrameCurveInfo, EAnimationError> {
@@ -83,7 +104,10 @@ impl FrameCurveInfoManager {
             list: vec![],
         }
     }
-    pub fn add_type(
+}
+
+impl TFrameCurveInfoManager for FrameCurveInfoManager {
+    fn add_type(
         &mut self,
         ty: KeyFrameDataType
     ) -> Result<(), EAnimationError> {
@@ -92,28 +116,28 @@ impl FrameCurveInfoManager {
         }
         Ok(())
     }
-    pub fn add(
+    fn insert(
         &mut self,
         ty: KeyFrameDataType,
         curve: FrameCurveInfo,
     ) -> FrameCurveInfoID {
-        self.list.get_mut(ty).unwrap().add(curve)
+        self.list.get_mut(ty).unwrap().insert(curve)
     }
-    pub fn del(
+    fn remove(
         &mut self,
         ty: KeyFrameDataType,
         id: FrameCurveInfoID,
     ) -> Result<(), EAnimationError> {
         match self.list.get_mut(ty) {
             Some(mgr) => {
-                mgr.del(id)
+                mgr.remove(id)
             },
             None => {
                 Ok(())
             },
         }
     }
-    pub fn get(
+    fn get(
         &self,
         ty: KeyFrameDataType,
         id: FrameCurveInfoID,
@@ -128,6 +152,7 @@ impl FrameCurveInfoManager {
         }
     }
 }
+
 /// 关键帧曲线描述信息
 #[derive(Debug, Clone, Copy)]
 pub struct FrameCurveInfo {
@@ -191,7 +216,10 @@ impl<T: FrameDataValue> FrameCurvePool<T> {
             // arcs: XHashMap::default(),
         }
     }
-    pub fn add(
+}
+
+impl<T: FrameDataValue> TFrameCurvePool<T> for FrameCurvePool<T> {
+    fn insert(
         &mut self,
         id: FrameCurveInfoID,
         curve: FrameCurve<T>,
@@ -203,7 +231,7 @@ impl<T: FrameDataValue> FrameCurvePool<T> {
 
         // self.arcs.insert(id, arc);
     }
-    pub fn del(
+    fn remove(
         &mut self,
         id: FrameCurveInfoID,
     ) -> Result<(), EAnimationError> {
@@ -219,7 +247,7 @@ impl<T: FrameDataValue> FrameCurvePool<T> {
         // self.arcs.remove(&id);
         // Ok(())
     }
-    pub fn get(
+    fn get(
         &self,
         id: FrameCurveInfoID,
     ) -> Result<Arc<FrameCurve<T>>, EAnimationError> {

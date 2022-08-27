@@ -310,7 +310,7 @@ impl AnimationGroup {
                 group_weight: self.blend_weight.0,
             };
             // println!("{:?}", temp);
-            runtime_infos.record(anime.animation.ty(), temp);
+            runtime_infos.insert(anime.animation.ty(), temp);
         }
     }
 }

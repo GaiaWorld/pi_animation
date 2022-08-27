@@ -2,13 +2,8 @@ use std::{ops::Index, fmt::{Debug, Display}, vec::Splice};
 
 use pi_curves::curve::{frame::{FrameDataValue, KeyFrameDataType, KeyFrameDataTypeAllocator, KeyFrameCurveValue, KeyFrame}, frame_curve::FrameCurve, FramePerSecond, ErrorCurve};
 
-use crate::{target_modifier::{IDAnimatableAttr, TAnimatableTargetModifier, IDAnimatableTarget, IDAnimatableTargetAllocator, TAnimatableTargetId}, animation_group::{AnimationGroup, AnimationGroupID, AnimationGroupRuntimeInfo, AnimationGroupManager}, error::EAnimationError, animation::{Animation, AnimationManager, AnimationID}, frame_curve_manager::{FrameCurveInfo, FrameCurvePool, FrameCurveInfoID, TypeFrameCurveInfoManager, FrameCurveInfoManager}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, loop_mode::ELoopMode, AnimatableFloat1, animation_listener::AnimationListener, curve_frame_event::CurveFrameEvent};
+use crate::{target_modifier::{IDAnimatableAttr, TAnimatableTargetModifier, IDAnimatableTarget, IDAnimatableTargetAllocator, TAnimatableTargetId}, animation_group::{AnimationGroup, AnimationGroupID, AnimationGroupRuntimeInfo, AnimationGroupManager}, error::EAnimationError, animation::{Animation, AnimationManager, AnimationID}, frame_curve_manager::{FrameCurveInfo, FrameCurvePool, FrameCurveInfoID, TypeFrameCurveInfoManager, FrameCurveInfoManager, TFrameCurveInfoManager, TFrameCurvePool}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, loop_mode::ELoopMode, AnimatableFloat1, animation_listener::AnimationListener, curve_frame_event::CurveFrameEvent};
 
-pub struct AnimationRuntimeInfo {
-    curve_infos: Vec<FrameCurveInfo>,
-    anime_infos: Vec<FrameCurveInfo>,
-    group_infos: Vec<AnimationGroupRuntimeInfo>,
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnimeResult<T: FrameDataValue> {
@@ -56,8 +51,8 @@ impl<T: FrameDataValue> TypeAnimationContext<T> {
         curve_infos: &mut FrameCurveInfoManager,
         curve: FrameCurve<T>,
     ) -> FrameCurveInfoID {
-        let id = curve_infos.add(self.ty, FrameCurvePool::curve_info(&curve));
-        self.curves.add(id, curve);
+        let id = curve_infos.insert(self.ty, FrameCurvePool::curve_info(&curve));
+        self.curves.insert(id, curve);
 
         id
     }
