@@ -183,6 +183,7 @@ impl TypeAnimationContextMgr {
 mod test01 {
     use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, AnimatableFloat1, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent};
     use pi_curves::curve::{frame_curve::FrameCurve, FrameIndex, frame::KeyFrameCurveValue};
+    use pi_slotmap::SlotMap;
     use test::{Bencher};
 
     use crate::{TypeAnimationContextMgr, Value0, Target0, Target0AnimatableAttrSet};
@@ -229,6 +230,10 @@ mod test01 {
 
     #[test]
     fn test_event() {
+        
+        // let mut map = SlotMap::default();
+        // map.
+
         // 创建动画管理器
         let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
 
