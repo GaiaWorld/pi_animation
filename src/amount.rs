@@ -19,14 +19,18 @@ impl Default for AnimationAmountCalc {
 
 impl AnimationAmountCalc {
     pub fn from_steps(step: u16, mode: EStepMode) -> Self {
-        let mode = EAmountMode::Steps(mode);
-        Self {
-            mode,
-            param: AmountParam(step as KeyFrameCurveValue, 0., 0., 0.),
-            call: EAmountMode::get_transform_amount_call(mode),
+        if step <= 1 {
+            AnimationAmountCalc::default()
+        } else {
+            let mode = EAmountMode::Steps(mode);
+            Self {
+                mode,
+                param: AmountParam(step as KeyFrameCurveValue, 0., 0., 0.),
+                call: EAmountMode::get_transform_amount_call(mode),
+            }
         }
     }
-    pub fn from_easing(step: u16, mode: EEasingMode) -> Self {
+    pub fn from_easing(mode: EEasingMode) -> Self {
         let mode = EAmountMode::Easing(mode);
         Self {
             mode,
@@ -34,7 +38,7 @@ impl AnimationAmountCalc {
             call: EAmountMode::get_transform_amount_call(mode),
         }
     }
-    pub fn from_cubic_bezier(step: u16, x1: f32, y1: f32, x2: f32, y2: f32) -> Self {
+    pub fn from_cubic_bezier(x1: f32, y1: f32, x2: f32, y2: f32) -> Self {
         let mode = EAmountMode::CubicBezier;
         Self {
             mode,
