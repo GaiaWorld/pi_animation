@@ -14,10 +14,16 @@ impl Add for Value1 {
 impl FrameValueScale for Value1 {
     fn scale(&self, rhs: KeyFrameCurveValue) -> Self {
         Self(
-            self.0 * rhs as u32,
-            self.1 * rhs as u32
+            (self.0 as KeyFrameCurveValue * rhs) as u32,
+            (self.1 as KeyFrameCurveValue * rhs) as u32
         )
     }
 }
 impl FrameDataValue for Value1 {
+    fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
+        Self(
+            (self.0 as KeyFrameCurveValue * (1.0 - amount) + rhs.0 as KeyFrameCurveValue * amount) as u32,
+            (self.0 as KeyFrameCurveValue * (1.0 - amount) + rhs.0 as KeyFrameCurveValue * amount) as u32,
+        )
+    }
 }

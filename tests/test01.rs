@@ -21,6 +21,11 @@ impl FrameValueScale for Value0 {
     }
 }
 impl FrameDataValue for Value0 {
+    fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
+        Self(
+            self.0 * (1.0 - amount) + rhs.0 * amount
+        )
+    }
 }
 
 ////////////////////////////////////////////////////////////////
@@ -35,12 +40,18 @@ impl Add for Value1 {
 impl FrameValueScale for Value1 {
     fn scale(&self, rhs: KeyFrameCurveValue) -> Self {
         Self(
-            self.0 * rhs as u32,
-            self.1 * rhs as u32
+            (self.0 as KeyFrameCurveValue * rhs) as u32,
+            (self.1 as KeyFrameCurveValue * rhs) as u32
         )
     }
 }
 impl FrameDataValue for Value1 {
+    fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
+        Self(
+            (self.0 as KeyFrameCurveValue * (1.0 - amount) + rhs.0 as KeyFrameCurveValue * amount) as u32,
+            (self.0 as KeyFrameCurveValue * (1.0 - amount) + rhs.0 as KeyFrameCurveValue * amount) as u32,
+        )
+    }
 }
 ////////////////////////////////////////////////////////////////
 
@@ -181,8 +192,8 @@ impl TypeAnimationContextMgr {
 
 #[cfg(test)]
 mod test01 {
-    use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, AnimatableFloat1, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent};
-    use pi_curves::curve::{frame_curve::FrameCurve, FrameIndex, frame::KeyFrameCurveValue};
+    use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, AnimatableFloat1, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc};
+    use pi_curves::{curve::{frame_curve::FrameCurve, FrameIndex, frame::KeyFrameCurveValue}, easing::EEasingMode, steps::EStepMode};
     use pi_slotmap::SlotMap;
     use test::{Bencher};
 
@@ -209,7 +220,7 @@ mod test01 {
         // 向动画组添加 动画
         type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, &target);
         // 启动动画组
-        type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30);
+        type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
 
         // 动画运行
         type_animation_ctx_mgr.anime(100);
@@ -253,8 +264,76 @@ mod test01 {
         // 向动画组添加 动画
         type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, &target);
         // 启动动画组
-        type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30);
+        type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
 
+
+        // 查询动画事件
+        // 创建帧事件
+        let mut curve_frame_event = CurveFrameEvent::<TestFrameEventData>::new(60);
+        curve_frame_event.add(10, TestFrameEventData::Test0);
+        curve_frame_event.add(50, TestFrameEventData::Test1);
+        // 创建动画监听器 - 监听动画组 group0
+        let mut listener = AnimationListener::<TestFrameEventData> { 
+            group: group0,
+            on_start: Some(Box::new(|| {
+                println!("Group Event Start.");
+                Ok(EAnimationEventResult::RemoveListen)
+            })),
+            on_end: Some(Box::new(|| {
+                println!("Group Event End.");
+                Ok(EAnimationEventResult::RemoveListen)
+            })),
+            on_loop: Some(Box::new(|looped_count| {
+                println!("Group Event Loop {}.", looped_count);
+                Ok(EAnimationEventResult::None)
+            })),
+            on_frame_event: Some(Box::new(|events| {
+                events.iter().for_each(|v| {
+                    println!("Group Event Frame Event {:?}.", v);
+                });
+                Ok(EAnimationEventResult::None)
+            })),
+        };
+        
+        for i in 0..30 {
+            // 动画运行
+            type_animation_ctx_mgr.anime(50);
+            type_animation_ctx_mgr.animation_context_amount.animation_event(&mut listener, Some(&curve_frame_event));
+            // 查询动画结果
+            let results = type_animation_ctx_mgr.f32_ctx.query_result(target.anime_target_id());
+            results.iter().for_each(|value| {
+                target.anime_modify(value.attr, value.value);
+            });
+        }
+
+    }
+    
+    #[test]
+    fn test_step_amount() {
+        
+        // let mut map = SlotMap::default();
+        // map.
+
+        // 创建动画管理器
+        let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
+
+        // 创建一个动画要作用的目标对象
+        let mut target = Target0::default(type_animation_ctx_mgr.allocat_target_id());
+
+        // 创建动画曲线
+        let frame_count = 60 as FrameIndex;
+        let mut curve1 = FrameCurve::curve_easing(AnimatableFloat1(0.0f32), AnimatableFloat1(100.0f32), frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
+        let curve1_id = type_animation_ctx_mgr.f32_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, curve1);
+
+        // 创建属性动画
+        let animation0 = type_animation_ctx_mgr.animation_context_amount.add_animation(&mut type_animation_ctx_mgr.curve_infos, curve1_id, Target0AnimatableAttrSet::V2 as IDAnimatableAttr, type_animation_ctx_mgr.f32_ctx.ty()).unwrap();
+
+        // 创建动画组
+        let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group(&mut type_animation_ctx_mgr.target_allocator);
+        // 向动画组添加 动画
+        type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, &target);
+        // 启动动画组
+        type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::from_steps(5, EStepMode::JumpNone));
 
         // 查询动画事件
         // 创建帧事件
@@ -308,9 +387,9 @@ mod test01 {
         let frame_count = 60 as FrameIndex;
         // MinMaxCurve
         let mut curve0 = FrameCurve::curve_minmax_curve(Value0(0.0f32), Value0(1.0f32), 60);
-        curve0 = FrameCurve::curve_minmax_curve_frame(curve0, 0, 0.0f32, 2.0f32, 2.0f32);
-        curve0 = FrameCurve::curve_minmax_curve_frame(curve0, (frame_count/2) as FrameIndex, 0.5f32, 0.0f32, 0.0f32);
-        curve0 = FrameCurve::curve_minmax_curve_frame(curve0, frame_count as FrameIndex, 1.0f32, 2.0f32, 2.0f32);
+        FrameCurve::curve_minmax_curve_frame(&mut curve0, 0, 0.0f32, 2.0f32, 2.0f32);
+        FrameCurve::curve_minmax_curve_frame(&mut curve0, (frame_count/2) as FrameIndex, 0.5f32, 0.0f32, 0.0f32);
+        FrameCurve::curve_minmax_curve_frame(&mut curve0, frame_count as FrameIndex, 1.0f32, 2.0f32, 2.0f32);
 
         let curve0_id = type_animation_ctx_mgr.value0_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, curve0);
 
@@ -344,7 +423,7 @@ mod test01 {
             for j in 0..group_animation_range {
                 type_animation_ctx_mgr.animation_context_amount.add_target_animation(i, group0, targets.get(j).unwrap());
             }
-            type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30);
+            type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
         }
  
         // 测试 动画性能 计 10w 个动画计算 & 10_000 个对象的数据修改

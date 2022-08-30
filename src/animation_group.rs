@@ -1,6 +1,6 @@
-use pi_curves::curve::{frame::KeyFrameCurveValue, FramePerSecond, FrameIndex};
+use pi_curves::{curve::{frame::KeyFrameCurveValue, FramePerSecond, FrameIndex}, easing::{function::get_easing_call, EEasingMode}};
 
-use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTargetAllocator}, frame_curve_manager::{FrameCurveInfoID, FrameCurveInfo}, animation::{AnimationID, self, AnimationManager, AnimationInfo}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, AnimatableFloat1};
+use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTargetAllocator}, frame_curve_manager::{FrameCurveInfoID, FrameCurveInfo}, animation::{AnimationID, self, AnimationManager, AnimationInfo}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, AnimatableFloat1, amount::AnimationAmountCalc};
 
 pub type AnimationGroupID = usize;
 
@@ -114,6 +114,7 @@ pub struct AnimationGroup {
     /// 动画组的在秒单位下的进度
     amount_in_second: KeyFrameCurveValue,
     amount: fn(KeyFrameCurveValue, KeyFrameCurveValue) -> (KeyFrameCurveValue, u16),
+    amount_calc: AnimationAmountCalc,
 }
 
 impl AnimationGroup {
@@ -137,6 +138,7 @@ impl AnimationGroup {
             amount_in_second: 0.,
             
             amount: get_amount_calc(ELoopMode::Not),
+            amount_calc: AnimationAmountCalc::default(),
         }
     }
 
@@ -164,14 +166,16 @@ impl AnimationGroup {
             // println!("{}, {}", self.once_time, self.delay_time);
 
             let (amount, loop_count) = amount_call(self.once_time, self.delay_time);
-            let amount_in_second = amount + self.from / self.frame_per_second as KeyFrameCurveValue;
+
+            let anime_amount = self.amount_calc.calc(amount);
+            let amount_in_second = anime_amount + self.from / self.frame_per_second as KeyFrameCurveValue;
     
             if self.is_loop {
                 group_info.loop_event = self.looped_count != loop_count;
                 group_info.looped_count = loop_count;
                 self.looped_count = loop_count;
             } else {
-                if amount == 1. {
+                if amount >= 1. {
                     group_info.end_event = true;
                     self.is_playing = false;
                 }
@@ -206,6 +210,7 @@ impl AnimationGroup {
         to: KeyFrameCurveValue,
         frame_per_second: FramePerSecond,
         group_info: &mut AnimationGroupRuntimeInfo,
+        amount_calc: AnimationAmountCalc,
     ) {
         self.is_loop = is_loop;
         self.is_playing = true;
@@ -221,6 +226,8 @@ impl AnimationGroup {
         self.to(to);
 
         self.once_time();
+
+        self.amount_calc = amount_calc;
 
         match loop_mode {
             ELoopMode::Opposite => {

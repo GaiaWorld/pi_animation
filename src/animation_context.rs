@@ -1,8 +1,8 @@
 use std::{ops::Index, fmt::{Debug, Display}, vec::Splice};
 
-use pi_curves::curve::{frame::{FrameDataValue, KeyFrameDataType, KeyFrameDataTypeAllocator, KeyFrameCurveValue, KeyFrame}, frame_curve::FrameCurve, FramePerSecond, ErrorCurve};
+use pi_curves::{curve::{frame::{FrameDataValue, KeyFrameDataType, KeyFrameDataTypeAllocator, KeyFrameCurveValue, KeyFrame}, frame_curve::FrameCurve, FramePerSecond, ErrorCurve}, easing::EEasingMode};
 
-use crate::{target_modifier::{IDAnimatableAttr, TAnimatableTargetModifier, IDAnimatableTarget, IDAnimatableTargetAllocator, TAnimatableTargetId}, animation_group::{AnimationGroup, AnimationGroupID, AnimationGroupRuntimeInfo, AnimationGroupManager}, error::EAnimationError, animation::{Animation, AnimationManager, AnimationID}, frame_curve_manager::{FrameCurveInfo, FrameCurvePool, FrameCurveInfoID, TypeFrameCurveInfoManager, FrameCurveInfoManager, TFrameCurveInfoManager, TFrameCurvePool}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, loop_mode::ELoopMode, AnimatableFloat1, animation_listener::AnimationListener, curve_frame_event::CurveFrameEvent};
+use crate::{target_modifier::{IDAnimatableAttr, TAnimatableTargetModifier, IDAnimatableTarget, IDAnimatableTargetAllocator, TAnimatableTargetId}, animation_group::{AnimationGroup, AnimationGroupID, AnimationGroupRuntimeInfo, AnimationGroupManager}, error::EAnimationError, animation::{Animation, AnimationManager, AnimationID}, frame_curve_manager::{FrameCurveInfo, FrameCurvePool, FrameCurveInfoID, TypeFrameCurveInfoManager, FrameCurveInfoManager, TFrameCurveInfoManager, TFrameCurvePool}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, loop_mode::ELoopMode, AnimatableFloat1, animation_listener::AnimationListener, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc};
 
 
 #[derive(Debug, Clone, Copy)]
@@ -240,13 +240,14 @@ impl AnimationContextAmount {
         from: KeyFrameCurveValue,
         to: KeyFrameCurveValue,
         frame_per_second: FramePerSecond,
+        amount_calc: AnimationAmountCalc,
     ) -> Result<(), EAnimationError> {
         match  self.group_infos.get_mut(id) {
             Some(group_info) => match group_info.is_playing {
                 true => Err(EAnimationError::AnimationGroupHasStarted),
                 false => {
                     group_info.is_playing = true;
-                    self.group_mgr.get_mut(id).unwrap().start(is_loop, speed, loop_mode, from, to, frame_per_second, group_info);
+                    self.group_mgr.get_mut(id).unwrap().start(is_loop, speed, loop_mode, from, to, frame_per_second, group_info, amount_calc);
                     Ok(())
                 },
             },

@@ -14,6 +14,7 @@ pub mod runtime_info;
 pub mod target_animation;
 pub mod animation_listener;
 pub mod curve_frame_event;
+pub mod amount;
 
 /// 可动画的 f32 数据
 #[derive(Debug, Clone, Copy)]
@@ -32,6 +33,11 @@ impl FrameValueScale for AnimatableFloat1 {
     }
 }
 impl FrameDataValue for AnimatableFloat1 {
+    fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
+        Self (
+            self.0 * (1.0 - amount) + rhs.0 * amount
+        )
+    }
 }
 
 /// 可动画的 (f32, f32) 数据
@@ -52,6 +58,13 @@ impl FrameValueScale for AnimatableFloat2 {
     }
 }
 impl FrameDataValue for AnimatableFloat2 {
+    fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
+        Self(
+            self.0 * (1.0 - amount) + rhs.0 * amount,
+            self.1 * (1.0 - amount) + rhs.1 * amount
+        )
+        
+    }
 }
 
 /// 可动画的 (f32, f32, f32) 数据
@@ -73,6 +86,13 @@ impl FrameValueScale for AnimatableFloat3 {
     }
 }
 impl FrameDataValue for AnimatableFloat3 {
+    fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
+        Self(
+            self.0 * (1.0 - amount) + rhs.0 * amount,
+            self.1 * (1.0 - amount) + rhs.1 * amount,
+            self.2 * (1.0 - amount) + rhs.2 * amount,
+        )
+    }
 }
 
 /// 可动画的 (f32, f32, f32, f32) 数据
@@ -95,4 +115,12 @@ impl FrameValueScale for AnimatableFloat4 {
     }
 }
 impl FrameDataValue for AnimatableFloat4 {
+    fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
+        Self(
+            self.0 * (1.0 - amount) + rhs.0 * amount,
+            self.1 * (1.0 - amount) + rhs.1 * amount,
+            self.2 * (1.0 - amount) + rhs.2 * amount,
+            self.3 * (1.0 - amount) + rhs.3 * amount,
+        )
+    }
 }
