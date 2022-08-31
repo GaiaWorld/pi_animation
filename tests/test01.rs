@@ -3,7 +3,7 @@ extern crate test;
 
 use std::ops::Add;
 
-use pi_animation::{target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId, IDAnimatableTargetAllocator}, error::EAnimationError, animation_context::{TypeAnimationContext, AnimationContextAmount}, runtime_info::RuntimeInfoMap, frame_curve_manager::FrameCurveInfoManager, AnimatableFloat1};
+use pi_animation::{target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId, IDAnimatableTargetAllocator, IDAnimatableTargetAllocatorDefault}, error::EAnimationError, animation_context::{TypeAnimationContext, AnimationContextAmount}, runtime_info::RuntimeInfoMap, frame_curve_manager::FrameCurveInfoManager, animation_result_pool::{TypeAnimationResultPoolDefault, TypeAnimationResultPool}, animation_group_manager::AnimationGroupManagerDefault, animation::AnimationManagerDefault};
 use pi_curves::curve::frame::{FrameValueScale, FrameDataValue, KeyFrameDataType, KeyFrameCurveValue, KeyFrameDataTypeAllocator};
 
 ////////////////////////////////////////////////////////////////
@@ -18,13 +18,6 @@ impl Add for Value0 {
 impl FrameValueScale for Value0 {
     fn scale(&self, rhs: KeyFrameCurveValue) -> Self {
         Self(self.0 * rhs as f32)
-    }
-}
-impl FrameDataValue for Value0 {
-    fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
-        Self(
-            self.0 * (1.0 - amount) + rhs.0 * amount
-        )
     }
 }
 
@@ -45,14 +38,6 @@ impl FrameValueScale for Value1 {
         )
     }
 }
-impl FrameDataValue for Value1 {
-    fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
-        Self(
-            (self.0 as KeyFrameCurveValue * (1.0 - amount) + rhs.0 as KeyFrameCurveValue * amount) as u32,
-            (self.0 as KeyFrameCurveValue * (1.0 - amount) + rhs.0 as KeyFrameCurveValue * amount) as u32,
-        )
-    }
-}
 ////////////////////////////////////////////////////////////////
 
 
@@ -62,11 +47,11 @@ pub struct Target0 {
     v0: Value0,
     v0a: Value0,
     v1: Value1,
-    v2: AnimatableFloat1,
+    v2: f32,
 }
 impl Target0 {
     pub fn default(anim_target: IDAnimatableTarget) -> Self {
-        Self { v0: Value0(0.), v0a: Value0(0.), v1: Value1(0, 0), v2: AnimatableFloat1(0.), anim_target }
+        Self { v0: Value0(0.), v0a: Value0(0.), v1: Value1(0, 0), v2: 0., anim_target }
     }
 }
 /// 定义 Target0 对象的 可动画属性枚举
@@ -95,8 +80,8 @@ impl TAnimatableTargetModifier<Value1> for Target0 {
         Ok(())
     }
 }
-impl TAnimatableTargetModifier<AnimatableFloat1> for Target0 {
-    fn anime_modify(&mut self, attr: IDAnimatableAttr, value: AnimatableFloat1) -> Result<(), EAnimationError> {
+impl TAnimatableTargetModifier<f32> for Target0 {
+    fn anime_modify(&mut self, attr: IDAnimatableAttr, value: f32) -> Result<(), EAnimationError> {
         self.v2 = value;
         println!("Target Modify: Attr: {:?}, Value: {:?}", attr, value);
         Ok(())
@@ -106,27 +91,37 @@ impl TAnimatableTargetModifier<AnimatableFloat1> for Target0 {
 ////////////////////////////////////////////////////////////////
 pub struct TypeAnimationContextMgr {
     pub value0_ctx: TypeAnimationContext<Value0>,
+    pub value0_result_pool: TypeAnimationResultPoolDefault<Value0>,
     pub value1_ctx: TypeAnimationContext<Value1>,
-    pub f32_ctx: TypeAnimationContext<AnimatableFloat1>,
+    pub value1_result_pool: TypeAnimationResultPoolDefault<Value1>,
+    pub f32_ctx: TypeAnimationContext<f32>,
+    pub f32_result_pool: TypeAnimationResultPoolDefault<f32>,
     pub runtime_infos: RuntimeInfoMap,
     pub curve_infos: FrameCurveInfoManager,
-    pub target_allocator: IDAnimatableTargetAllocator,
+    pub target_allocator: IDAnimatableTargetAllocatorDefault,
     pub ty_allocator: KeyFrameDataTypeAllocator,
-    pub animation_context_amount: AnimationContextAmount,
+    pub animation_context_amount: AnimationContextAmount<AnimationManagerDefault, AnimationGroupManagerDefault>,
 }
 
 impl TypeAnimationContextMgr {
     pub fn default() -> Self {
         let mut runtime_infos = RuntimeInfoMap::default();
         let mut curve_infos = FrameCurveInfoManager::default();
-        let mut target_allocator = IDAnimatableTargetAllocator::default();
-        let mut animation_context_amount = AnimationContextAmount::default(target_allocator.allocat().unwrap());
+        let mut target_allocator = IDAnimatableTargetAllocatorDefault::default();
+        let mut animation_context_amount = AnimationContextAmount::default(target_allocator.allocat().unwrap(), AnimationManagerDefault::default(), AnimationGroupManagerDefault::default());
         let mut ty_allocator = KeyFrameDataTypeAllocator::default();
 
         let value0_ctx = TypeAnimationContext::new(&mut ty_allocator, &mut runtime_infos, &mut curve_infos);
+        let value0_result_pool = TypeAnimationResultPoolDefault::default();
         let value1_ctx = TypeAnimationContext::new(&mut ty_allocator, &mut runtime_infos, &mut curve_infos);
+        let value1_result_pool = TypeAnimationResultPoolDefault::default();
         let f32_ctx = TypeAnimationContext::new(&mut ty_allocator, &mut runtime_infos, &mut curve_infos);
-        Self { value0_ctx, value1_ctx, f32_ctx, runtime_infos, curve_infos, target_allocator, animation_context_amount, ty_allocator,  }
+        let f32_result_pool = TypeAnimationResultPoolDefault::default();
+        Self {
+            value0_ctx, value0_result_pool,
+            value1_ctx, value1_result_pool,
+            f32_ctx, f32_result_pool,
+            runtime_infos, curve_infos, target_allocator, animation_context_amount, ty_allocator,  }
     }
 
     /// 运行动画
@@ -138,9 +133,9 @@ impl TypeAnimationContextMgr {
 
         self.animation_context_amount.anime_curve_calc(delta_ms, &mut self.runtime_infos);
 
-        let mut r0 = self.value0_ctx.anime(&self.runtime_infos);
-        let r1 = self.value1_ctx.anime(&self.runtime_infos);
-        let r2 = self.f32_ctx.anime(&self.runtime_infos);
+        let mut r0 = self.value0_ctx.anime(&self.runtime_infos, &mut self.value0_result_pool);
+        let r1 = self.value1_ctx.anime(&self.runtime_infos, &mut self.value1_result_pool);
+        let r2 = self.f32_ctx.anime(&self.runtime_infos, &mut self.f32_result_pool);
 
         // cb(&self.value0_ctx.result);
 
@@ -157,17 +152,17 @@ impl TypeAnimationContextMgr {
 
         self.animation_context_amount.anime_curve_calc(delta_ms, &mut self.runtime_infos);
 
-        self.value0_ctx.anime_uncheck(&self.runtime_infos);
-        self.value1_ctx.anime_uncheck(&self.runtime_infos);
-        self.f32_ctx.anime_uncheck(&self.runtime_infos);
+        self.value0_ctx.anime_uncheck(&self.runtime_infos, &mut self.value0_result_pool);
+        self.value1_ctx.anime_uncheck(&self.runtime_infos, &mut self.value1_result_pool);
+        self.f32_ctx.anime_uncheck(&self.runtime_infos, &mut self.f32_result_pool);
     }
 
     /// 动画中间数据清理
     pub fn reset(&mut self) {
         self.runtime_infos.reset();
-        self.value0_ctx.reset();
-        self.value1_ctx.reset();
-        self.f32_ctx.reset();
+        self.value0_result_pool.reset();
+        self.value1_result_pool.reset();
+        self.f32_result_pool.reset();
     }
 
     /// 分配目标ID
@@ -175,9 +170,9 @@ impl TypeAnimationContextMgr {
         &mut self,
     ) -> IDAnimatableTarget {
         let id = self.target_allocator.allocat().unwrap();
-        self.value0_ctx.record_target(id);
-        self.value1_ctx.record_target(id);
-        self.f32_ctx.record_target(id);
+        self.value0_result_pool.record_target(id);
+        self.value1_result_pool.record_target(id);
+        self.f32_result_pool.record_target(id);
 
         id
     }
@@ -192,7 +187,7 @@ impl TypeAnimationContextMgr {
 
 #[cfg(test)]
 mod test01 {
-    use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, AnimatableFloat1, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc};
+    use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc};
     use pi_curves::{curve::{frame_curve::FrameCurve, FrameIndex, frame::KeyFrameCurveValue}, easing::EEasingMode, steps::EStepMode};
     use pi_slotmap::SlotMap;
     use test::{Bencher};
@@ -209,7 +204,7 @@ mod test01 {
 
         // 创建动画曲线
         let frame_count = 60 as FrameIndex;
-        let mut curve1 = FrameCurve::curve_easing(AnimatableFloat1(0.0f32), AnimatableFloat1(100.0f32), frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
+        let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
         let curve1_id = type_animation_ctx_mgr.f32_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, curve1);
 
         // 创建属性动画
@@ -226,7 +221,7 @@ mod test01 {
         type_animation_ctx_mgr.anime(100);
 
         // 查询动画结果
-        let results = type_animation_ctx_mgr.f32_ctx.query_result(target.anime_target_id());
+        let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
         println!("{:?}", results);
         results.iter().for_each(|value| {
             target.anime_modify(value.attr, value.value);
@@ -253,7 +248,7 @@ mod test01 {
 
         // 创建动画曲线
         let frame_count = 60 as FrameIndex;
-        let mut curve1 = FrameCurve::curve_easing(AnimatableFloat1(0.0f32), AnimatableFloat1(100.0f32), frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
+        let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
         let curve1_id = type_animation_ctx_mgr.f32_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, curve1);
 
         // 创建属性动画
@@ -300,7 +295,7 @@ mod test01 {
             type_animation_ctx_mgr.anime(50);
             type_animation_ctx_mgr.animation_context_amount.animation_event(&mut listener, Some(&curve_frame_event));
             // 查询动画结果
-            let results = type_animation_ctx_mgr.f32_ctx.query_result(target.anime_target_id());
+            let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
             results.iter().for_each(|value| {
                 target.anime_modify(value.attr, value.value);
             });
@@ -322,7 +317,7 @@ mod test01 {
 
         // 创建动画曲线
         let frame_count = 60 as FrameIndex;
-        let mut curve1 = FrameCurve::curve_easing(AnimatableFloat1(0.0f32), AnimatableFloat1(100.0f32), frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
+        let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
         let curve1_id = type_animation_ctx_mgr.f32_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, curve1);
 
         // 创建属性动画
@@ -333,7 +328,7 @@ mod test01 {
         // 向动画组添加 动画
         type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, &target);
         // 启动动画组
-        type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::from_steps(5, EStepMode::JumpNone));
+        type_animation_ctx_mgr.animation_context_amount.start(group0, false, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::from_steps(5, EStepMode::JumpNone));
 
         // 查询动画事件
         // 创建帧事件
@@ -368,7 +363,7 @@ mod test01 {
             type_animation_ctx_mgr.anime(50);
             type_animation_ctx_mgr.animation_context_amount.animation_event(&mut listener, Some(&curve_frame_event));
             // 查询动画结果
-            let results = type_animation_ctx_mgr.f32_ctx.query_result(target.anime_target_id());
+            let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
             results.iter().for_each(|value| {
                 target.anime_modify(value.attr, value.value);
             });
@@ -434,7 +429,7 @@ mod test01 {
 
             for i in 0..group_animation_range {
                 let target = targets.get_mut(i).unwrap();
-                let results = type_animation_ctx_mgr.value0_ctx.query_result(i);
+                let results = type_animation_ctx_mgr.value0_result_pool.query_result(i);
 
                 results.iter().for_each(|value| {
                     target.anime_modify(value.attr, value.value);

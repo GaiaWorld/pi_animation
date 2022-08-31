@@ -19,11 +19,3 @@ impl FrameValueScale for Value1 {
         )
     }
 }
-impl FrameDataValue for Value1 {
-    fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
-        Self(
-            (self.0 as KeyFrameCurveValue * (1.0 - amount) + rhs.0 as KeyFrameCurveValue * amount) as u32,
-            (self.0 as KeyFrameCurveValue * (1.0 - amount) + rhs.0 as KeyFrameCurveValue * amount) as u32,
-        )
-    }
-}

@@ -18,6 +18,9 @@ impl Default for AnimationAmountCalc {
 }
 
 impl AnimationAmountCalc {
+    pub fn mode(&self) -> EAmountMode {
+        self.mode
+    }
     pub fn from_steps(step: u16, mode: EStepMode) -> Self {
         if step <= 1 {
             AnimationAmountCalc::default()

@@ -1,4 +1,4 @@
-use pi_curves::curve::{frame::KeyFrameCurveValue, FramePerSecond};
+use pi_curves::curve::{frame::KeyFrameCurveValue};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ELoopMode {

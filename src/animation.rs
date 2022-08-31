@@ -1,23 +1,16 @@
-use std::sync::Arc;
+use pi_curves::curve::{frame::{KeyFrameDataType}, FramePerSecond, FrameIndex};
 
-use pi_curves::curve::{frame_curve::FrameCurve, frame::{FrameDataValue, KeyFrameCurveValue, KeyFrameDataType}, FramePerSecond, FrameIndex};
-
-use crate::{target_modifier::{IDAnimatableAttr, TAnimatableTargetModifier}, error::EAnimationError, animation_group::AnimationGroupID, frame_curve_manager::{FrameCurveInfoID, FrameCurveInfo}};
+use crate::{target_modifier::{IDAnimatableAttr}, error::EAnimationError, frame_curve_manager::{FrameCurveInfoID, FrameCurveInfo}};
 
 pub type AnimationID = usize;
 
-
-pub struct Animation<T: FrameDataValue> {
-    attr: IDAnimatableAttr,
-    ty: KeyFrameDataType,
-    curve: Arc<FrameCurve<T>>,
-}
-
-impl<T: FrameDataValue> Animation<T> {
-    pub fn compute(&self, amount_in_second: f32) -> T {
-        let amount = amount_in_second * self.curve.design_frame_per_second as f32;
-        self.curve.interple(amount as KeyFrameCurveValue)
-    }
+pub trait AnimationManager {
+    /// 创建一个属性动画
+    fn create(&mut self, attr: IDAnimatableAttr, ty: KeyFrameDataType, curve_info: FrameCurveInfo, curve_id: FrameCurveInfoID,) -> AnimationID;
+    /// 删除一个属性动画
+    fn del(&mut self, id: AnimationID, ) -> Result<(), EAnimationError>;
+    /// 获取指定属性动画
+    fn get(&self, id: AnimationID,) -> Result<AnimationInfo, EAnimationError>;
 }
 
 /// 属性动画 数据结构
@@ -66,22 +59,25 @@ impl AnimationInfo {
 }
 
 /// 属性动画 数据的管理器
-pub struct AnimationManager {
+pub struct AnimationManagerDefault {
     id_pool: Vec<AnimationID>,
     counter: AnimationID,
     animation_infos: Vec<AnimationInfo>,
 }
 
-impl AnimationManager {
-    pub fn default() -> Self {
+impl Default for AnimationManagerDefault {
+    fn default() -> Self {
         Self {
             id_pool: vec![],
             counter: 0,
             animation_infos: vec![],
         }
     }
+}
+
+impl AnimationManager for AnimationManagerDefault {
     /// 创建一个属性动画
-    pub fn create(
+    fn create(
         &mut self,
         attr: IDAnimatableAttr,
         ty: KeyFrameDataType,
@@ -102,7 +98,7 @@ impl AnimationManager {
                 let id = self.counter;
                 self.counter += 1;
 
-                let info = self.animation_infos.push(AnimationInfo { attr, ty, curve_info, curve_id });
+                self.animation_infos.push(AnimationInfo { attr, ty, curve_info, curve_id });
                 id
             },
         };
@@ -110,7 +106,7 @@ impl AnimationManager {
         id
     }
     /// 删除一个属性动画
-    pub fn del(
+    fn del(
         &mut self,
         id: AnimationID,
     ) -> Result<(), EAnimationError> {
@@ -125,7 +121,7 @@ impl AnimationManager {
         }
     }
     /// 获取指定属性动画
-    pub fn get(
+    fn get(
         &self,
         id: AnimationID,
     ) -> Result<AnimationInfo, EAnimationError> {

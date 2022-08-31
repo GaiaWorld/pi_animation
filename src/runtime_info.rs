@@ -1,6 +1,6 @@
 use pi_curves::curve::frame::{KeyFrameDataType, KeyFrameCurveValue};
 
-use crate::{animation::AnimationInfo, target_modifier::{IDAnimatableTarget, IDAnimatableAttr}, error::EAnimationError, target_animation::TargetAnimation, frame_curve_manager::FrameCurveInfoID};
+use crate::{target_modifier::{IDAnimatableTarget, IDAnimatableAttr}, error::EAnimationError, frame_curve_manager::FrameCurveInfoID};
 
 /// 一个动画的运行时数据
 #[derive(Debug, Clone, Copy)]
@@ -32,7 +32,7 @@ impl RuntimeInfoMap {
     /// 仅在分配 KeyAnimeDataType 后立即调用
     pub fn add_type(
         &mut self,
-        ty: KeyFrameDataType,
+        _: KeyFrameDataType,
     ) {
         self.list.push(vec![]);
     }

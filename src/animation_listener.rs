@@ -74,7 +74,6 @@ impl<D: Clone> AnimationListener<D> {
         &mut self,
         frame_datas: Vec<D>,
     ) {
-        let mut remove = false;
         match &self.on_frame_event {
             Some(call) => {
                 match call(frame_datas) {

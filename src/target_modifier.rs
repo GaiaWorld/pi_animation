@@ -1,6 +1,6 @@
 use pi_curves::curve::frame::FrameDataValue;
 
-use crate::{error::EAnimationError, runtime_info::{self, RuntimeInfoMap}};
+use crate::{error::EAnimationError};
 
 /// 一个可动画的对象的ID - [0-usize::MAX]
 /// * 即同时最多支持 usize::MAX 个目标对象的动画
@@ -9,20 +9,30 @@ pub type IDAnimatableTarget = usize;
 /// * 即每个对象上最多支持256个属性的动画
 pub type IDAnimatableAttr = u8;
 
+/// 可动画目标对象ID分配器
+/// * 对每个目标而言应当是唯一的
+pub trait IDAnimatableTargetAllocator {
+    /// 分配 ID
+    fn allocat(&mut self) -> Result<IDAnimatableTarget, EAnimationError>;
+    /// 回收 ID
+    fn collect(&mut self, id: IDAnimatableTarget,);
+}
+
 /// 动画目标ID 分配器
-pub struct IDAnimatableTargetAllocator {
+pub struct IDAnimatableTargetAllocatorDefault {
     id_pool: Vec<IDAnimatableTarget>,
     counter: IDAnimatableTarget,
 }
-
-impl IDAnimatableTargetAllocator {
-    pub fn default() -> Self {
+impl Default for IDAnimatableTargetAllocatorDefault {
+    fn default() -> Self {
         Self {
             id_pool: vec![],
             counter: 0
         }
     }
-    pub fn allocat(&mut self) -> Result<IDAnimatableTarget, EAnimationError> {
+}
+impl IDAnimatableTargetAllocator for IDAnimatableTargetAllocatorDefault {
+    fn allocat(&mut self) -> Result<IDAnimatableTarget, EAnimationError> {
         match self.id_pool.pop() {
             Some(id) => {
                 Ok(id)
@@ -38,7 +48,7 @@ impl IDAnimatableTargetAllocator {
             }
         }
     }
-    pub fn collect(
+    fn collect(
         &mut self,
         id: IDAnimatableTarget,
     ) {

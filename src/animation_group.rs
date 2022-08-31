@@ -1,6 +1,6 @@
-use pi_curves::{curve::{frame::KeyFrameCurveValue, FramePerSecond, FrameIndex}, easing::{function::get_easing_call, EEasingMode}};
+use pi_curves::{curve::{frame::KeyFrameCurveValue, FramePerSecond, FrameIndex}};
 
-use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTargetAllocator}, frame_curve_manager::{FrameCurveInfoID, FrameCurveInfo}, animation::{AnimationID, self, AnimationManager, AnimationInfo}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, AnimatableFloat1, amount::AnimationAmountCalc};
+use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, amount::AnimationAmountCalc};
 
 pub type AnimationGroupID = usize;
 
@@ -20,67 +20,6 @@ pub struct AnimationGroupRuntimeInfo {
     pub start_event: bool,
     /// 是否触发 end 事件
     pub end_event: bool,
-}
-
-pub struct AnimationGroupManager {
-    id_pool: Vec<AnimationGroupID>,
-    counter: AnimationGroupID,
-    groups: Vec<AnimationGroup>,
-}
-
-impl AnimationGroupManager {
-    pub fn default() -> Self {
-        Self {
-            id_pool: vec![],
-            groups: vec![],
-            counter: 0,
-        }
-    }
-    pub fn create(
-        &mut self,
-        target_allocator: &mut IDAnimatableTargetAllocator,
-    ) -> AnimationGroupID {
-        let animatable_target_id = target_allocator.allocat().unwrap();
-        let id = match self.id_pool.pop() {
-            Some(id) => {
-                self.groups[id] = AnimationGroup::new(animatable_target_id, id);
-                id
-            },
-            None => {
-                let id = self.counter;
-                self.counter += 1;
-                self.groups.push(AnimationGroup::new(animatable_target_id, id));
-                id
-            },
-        };
-        id
-    }
-    pub fn del(
-        &mut self,
-        target_allocator: &mut IDAnimatableTargetAllocator,
-        id: AnimationGroupID,
-    ) {
-        match self.groups.get_mut(id) {
-            Some(group) => {
-                group.stop();
-                target_allocator.collect(group.anime_target_id());
-                self.id_pool.push(id);
-            },
-            None => {},
-        }
-    }
-    pub fn get_mut(
-        &mut self,
-        id: AnimationGroupID,
-    ) -> Option<&mut AnimationGroup> {
-        self.groups.get_mut(id)
-    }
-    pub fn get(
-        & self,
-        id: AnimationGroupID,
-    ) -> Option<&AnimationGroup> {
-        self.groups.get(id)
-    }
 }
 
 /// 动画组数据结构
@@ -110,7 +49,7 @@ pub struct AnimationGroup {
     once_time: KeyFrameCurveValue,
     is_playing: bool,
     /// 动画组的混合权重
-    blend_weight: AnimatableFloat1,
+    blend_weight: f32,
     /// 动画组的在秒单位下的进度
     amount_in_second: KeyFrameCurveValue,
     amount: fn(KeyFrameCurveValue, KeyFrameCurveValue) -> (KeyFrameCurveValue, u16),
@@ -134,7 +73,7 @@ impl AnimationGroup {
             max_frame: 0,
             once_time: 1.,
             is_playing: false,
-            blend_weight: AnimatableFloat1(1.0),
+            blend_weight: 1.0,
             amount_in_second: 0.,
             
             amount: get_amount_calc(ELoopMode::Not),
@@ -146,7 +85,6 @@ impl AnimationGroup {
     pub fn anime(
         &mut self,
         runtime_infos: &mut RuntimeInfoMap,
-        animation_mgr: &AnimationManager,
         delta_ms: KeyFrameCurveValue,
         group_info: &mut AnimationGroupRuntimeInfo,
     ) {
@@ -158,9 +96,7 @@ impl AnimationGroup {
             if self.delay_time.abs() < 0.00001 {
                 group_info.start_event = true;
             }
-    
-            self.delay_time += delta_ms * self.speed;
-    
+
             let amount_call = &self.amount;
 
             // println!("{}, {}", self.once_time, self.delay_time);
@@ -186,7 +122,9 @@ impl AnimationGroup {
 
             group_info.amount_in_second = amount_in_second;
     
-            self.update_to_infos(animation_mgr, runtime_infos);
+            self.update_to_infos(runtime_infos);
+
+            self.delay_time += delta_ms * self.speed;
         }
     }
     /// 添加 目标动画
@@ -298,7 +236,6 @@ impl AnimationGroup {
     }
     fn update_to_infos(
         &self,
-        animation_mgr: &AnimationManager,
         runtime_infos: &mut RuntimeInfoMap,
     ) {
         for anime in self.animations.iter() {
@@ -314,7 +251,7 @@ impl AnimationGroup {
                 target: anime.target,
                 attr: anime.animation.attr(),
                 curve_id: anime.animation.curve_id(),
-                group_weight: self.blend_weight.0,
+                group_weight: self.blend_weight,
             };
             // println!("{:?}", temp);
             runtime_infos.insert(anime.animation.ty(), temp);
@@ -334,8 +271,8 @@ impl TAnimatableTargetId for AnimationGroup {
     }
 }
 /// 为 AnimationGroup 实现 TAnimatableTargetModifier
-impl TAnimatableTargetModifier<AnimatableFloat1> for AnimationGroup {
-    fn anime_modify(&mut self, attr: IDAnimatableAttr, value: AnimatableFloat1) -> Result<(), EAnimationError> {
+impl TAnimatableTargetModifier<f32> for AnimationGroup {
+    fn anime_modify(&mut self, attr: IDAnimatableAttr, value: f32) -> Result<(), EAnimationError> {
         if attr == AnimationGroupAnimatableAttrSet::BlendWeight as IDAnimatableAttr {
             self.blend_weight = value;
         }
