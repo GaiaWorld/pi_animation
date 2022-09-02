@@ -83,6 +83,6 @@ pub trait TAnimatableTargetModifier<T: FrameDataValue> {
     fn anime_modify(&mut self, attr: IDAnimatableAttr, value: T) -> Result<(), EAnimationError>;
 }
 /// 可进行动画的目标ID特征
-pub trait TAnimatableTargetId {
-    fn anime_target_id(&self) -> IDAnimatableTarget;
+pub trait TAnimatableTargetId<T> {
+    fn anime_target_id(&self) -> T;
 }

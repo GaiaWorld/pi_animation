@@ -1,8 +1,9 @@
 use pi_curves::{curve::{frame::KeyFrameCurveValue, FramePerSecond, FrameIndex}};
+use pi_slotmap::{DefaultKey, Key};
 
 use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, amount::AnimationAmountCalc};
 
-pub type AnimationGroupID = usize;
+pub type AnimationGroupID = DefaultKey;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnimationGroupRuntimeInfo {
@@ -26,10 +27,10 @@ pub struct AnimationGroupRuntimeInfo {
 /// * 计算动画进度
 /// * 更新动画进度到内部的各个动画
 /// * 响应动画事件
-pub struct AnimationGroup {
-    animatable_target_id: IDAnimatableTarget,
+pub struct AnimationGroup<T: Clone> {
+    // animatable_target_id: T,
     id: AnimationGroupID,
-    animations: Vec<TargetAnimation>,
+    animations: Vec<TargetAnimation<T>>,
     is_loop: bool,
     /// 动画组速度
     pub speed: KeyFrameCurveValue,
@@ -56,11 +57,11 @@ pub struct AnimationGroup {
     amount_calc: AnimationAmountCalc,
 }
 
-impl AnimationGroup {
-    pub fn new(animatable_target_id: IDAnimatableTarget, id: AnimationGroupID) -> Self {
+impl<T: Clone> AnimationGroup<T> {
+    pub fn new() -> Self {
         Self {
-            animatable_target_id,
-            id,
+            // animatable_target_id,
+            id: AnimationGroupID::null(),
             animations: vec![],
             is_loop: false,
             speed: 1.,
@@ -81,10 +82,15 @@ impl AnimationGroup {
         }
     }
 
+	/// 设置id
+	pub fn set_id(&mut self, id: AnimationGroupID) {
+		self.id = id;
+	}
+
     /// 动画组运行接口
     pub fn anime(
         &mut self,
-        runtime_infos: &mut RuntimeInfoMap,
+        runtime_infos: &mut RuntimeInfoMap<T>,
         delta_ms: KeyFrameCurveValue,
         group_info: &mut AnimationGroupRuntimeInfo,
     ) {
@@ -130,7 +136,7 @@ impl AnimationGroup {
     /// 添加 目标动画
     pub fn add_target_animation(
         &mut self,
-        target_animation: TargetAnimation,
+        target_animation: TargetAnimation<T>,
     ) -> Result<(), EAnimationError> {
         // println!("{}", self.max_frame);
         self.max_frame = FramePerSecond::max(self.max_frame, target_animation.animation.get_max_frame_for_running_speed(self.frame_per_second));
@@ -236,7 +242,7 @@ impl AnimationGroup {
     }
     fn update_to_infos(
         &self,
-        runtime_infos: &mut RuntimeInfoMap,
+        runtime_infos: &mut RuntimeInfoMap<T>,
     ) {
         for anime in self.animations.iter() {
             let temp = RuntimeInfo {
@@ -248,7 +254,7 @@ impl AnimationGroup {
                 // },
                 amount_in_second: self.amount_in_second,
                 // anime: *anime,
-                target: anime.target,
+                target: anime.target.clone(),
                 attr: anime.animation.attr(),
                 curve_id: anime.animation.curve_id(),
                 group_weight: self.blend_weight,
@@ -265,13 +271,13 @@ pub enum AnimationGroupAnimatableAttrSet {
 }
 
 /// 为 AnimationGroup 实现 TAnimatableTargetId
-impl TAnimatableTargetId for AnimationGroup {
-    fn anime_target_id(&self) -> IDAnimatableTarget {
-        self.animatable_target_id
-    }
-}
+// impl<T> TAnimatableTargetId<T> for AnimationGroup<T> {
+//     fn anime_target_id(&self) -> T {
+//         self.animatable_target_id
+//     }
+// }
 /// 为 AnimationGroup 实现 TAnimatableTargetModifier
-impl TAnimatableTargetModifier<f32> for AnimationGroup {
+impl<T: Clone> TAnimatableTargetModifier<f32> for AnimationGroup<T> {
     fn anime_modify(&mut self, attr: IDAnimatableAttr, value: f32) -> Result<(), EAnimationError> {
         if attr == AnimationGroupAnimatableAttrSet::BlendWeight as IDAnimatableAttr {
             self.blend_weight = value;

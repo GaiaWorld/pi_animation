@@ -1,9 +1,33 @@
-use std::{fmt::{Debug}};
+use std::{fmt::Debug, marker::PhantomData};
 
-use pi_curves::{curve::{frame::{FrameDataValue, KeyFrameDataType, KeyFrameDataTypeAllocator, KeyFrameCurveValue}, frame_curve::FrameCurve, FramePerSecond}};
+use pi_curves::curve::{
+    frame::{FrameDataValue, KeyFrameCurveValue, KeyFrameDataType, KeyFrameDataTypeAllocator},
+    frame_curve::FrameCurve,
+    FramePerSecond,
+};
+use pi_slotmap::{DefaultKey, SecondaryMap};
 
-use crate::{target_modifier::{IDAnimatableAttr, TAnimatableTargetModifier, IDAnimatableTarget, IDAnimatableTargetAllocator, TAnimatableTargetId}, animation_group::{AnimationGroupID, AnimationGroupRuntimeInfo}, error::EAnimationError, animation::{AnimationManager, AnimationID}, frame_curve_manager::{FrameCurvePool, FrameCurveInfoID, FrameCurveInfoManager, TFrameCurveInfoManager, TFrameCurvePool}, runtime_info::{RuntimeInfoMap}, target_animation::TargetAnimation, loop_mode::ELoopMode, animation_listener::AnimationListener, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc, animation_result_pool::TypeAnimationResultPool, animation_group_manager::AnimationGroupManager};
-
+use crate::{
+    amount::AnimationAmountCalc,
+    animation::{AnimationID, AnimationManager},
+    animation_group::{AnimationGroupID, AnimationGroupRuntimeInfo},
+    animation_group_manager::AnimationGroupManager,
+    animation_listener::AnimationListener,
+    animation_result_pool::TypeAnimationResultPool,
+    curve_frame_event::CurveFrameEvent,
+    error::EAnimationError,
+    frame_curve_manager::{
+        FrameCurveInfoID, FrameCurveInfoManager, FrameCurvePool, TFrameCurveInfoManager,
+        TFrameCurvePool,
+    },
+    loop_mode::ELoopMode,
+    runtime_info::{RuntimeInfo, RuntimeInfoMap},
+    target_animation::TargetAnimation,
+    target_modifier::{
+        IDAnimatableAttr, IDAnimatableTarget, IDAnimatableTargetAllocator, TAnimatableTargetId,
+        TAnimatableTargetModifier,
+    },
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnimeResult<T: FrameDataValue> {
@@ -18,13 +42,12 @@ pub struct TypeAnimationContext<T: FrameDataValue> {
     curves: FrameCurvePool<T>,
 }
 
-impl<T: FrameDataValue> TypeAnimationContext<T> {
-    pub fn new(
-        ty_allocator: &mut KeyFrameDataTypeAllocator,
-        runtime_info_map: &mut RuntimeInfoMap,
+impl<F: FrameDataValue> TypeAnimationContext<F> {
+    pub fn new<T: Clone>(
+        ty: usize,
+        runtime_info_map: &mut RuntimeInfoMap<T>,
         curve_infos: &mut FrameCurveInfoManager,
     ) -> Self {
-        let ty = ty_allocator.alloc().unwrap();
         runtime_info_map.add_type(ty);
         curve_infos.add_type(ty);
         Self {
@@ -36,7 +59,7 @@ impl<T: FrameDataValue> TypeAnimationContext<T> {
     pub fn add_frame_curve(
         &mut self,
         curve_infos: &mut FrameCurveInfoManager,
-        curve: FrameCurve<T>,
+        curve: FrameCurve<F>,
     ) -> FrameCurveInfoID {
         let id = curve_infos.insert(self.ty, FrameCurvePool::curve_info(&curve));
         self.curves.insert(id, curve);
@@ -44,13 +67,14 @@ impl<T: FrameDataValue> TypeAnimationContext<T> {
         id
     }
     /// 使用曲线计算结果 计算属性值
-    pub fn anime<R: TypeAnimationResultPool<T>>(
-        &mut self,
-        runtime_infos: &RuntimeInfoMap,
+    pub fn anime<T: Clone, R: TypeAnimationResultPool<F, T>>(
+        &self,
+        runtime_infos: &RuntimeInfoMap<T>,
         result_pool: &mut R,
     ) -> Result<(), Vec<EAnimationError>> {
         let mut errs = vec![];
         let runtime_infos = runtime_infos.list.get(self.ty).unwrap();
+        log::trace!("anime, runtime_infos len: {}", runtime_infos.len());
         for info in runtime_infos {
             let curve = self.curves.get(info.curve_id);
             match curve {
@@ -60,28 +84,28 @@ impl<T: FrameDataValue> TypeAnimationContext<T> {
                     let result = AnimeResult {
                         value,
                         attr: info.attr,
-                        weight: info.group_weight
+                        weight: info.group_weight,
                     };
-                    match result_pool.record_result(info.target, info.attr, result) {
-                        Ok(_) => {},
+                    match result_pool.record_result(info.target.clone(), info.attr, result) {
+                        Ok(_) => {}
                         Err(e) => errs.push(e),
                     }
-                },
+                }
                 Err(e) => errs.push(e),
             }
         }
-    
+
         if errs.len() > 0 {
             Err(errs)
         } else {
             Ok(())
         }
     }
-    
+
     /// 使用曲线计算结果 计算属性值
-    pub fn anime_uncheck<R: TypeAnimationResultPool<T>>(
-        &mut self,
-        runtime_infos: &RuntimeInfoMap,
+    pub fn anime_uncheck<T: Clone, R: TypeAnimationResultPool<F, T>>(
+        &self,
+        runtime_infos: &RuntimeInfoMap<T>,
         result_pool: &mut R,
     ) {
         let runtime_infos = runtime_infos.list.get(self.ty).unwrap();
@@ -92,9 +116,9 @@ impl<T: FrameDataValue> TypeAnimationContext<T> {
             let result = AnimeResult {
                 value,
                 attr: info.attr,
-                weight: info.group_weight
+                weight: info.group_weight,
             };
-            result_pool.record_result(info.target, info.attr, result);
+            result_pool.record_result(info.target.clone(), info.attr, result);
         }
     }
     pub fn ty(&self) -> KeyFrameDataType {
@@ -109,26 +133,23 @@ impl<T: FrameDataValue> TypeAnimationContext<T> {
 /// * 自身也是可动画的目标
 ///   * 可动画的属性为
 ///     * time_scale
-pub struct AnimationContextAmount<A: AnimationManager, T: AnimationGroupManager> {
-    animatable_target_id: IDAnimatableTarget,
+pub struct AnimationContextAmount<A: AnimationManager, T: Clone, M: AnimationGroupManager<T>> {
     pub animation_mgr: A,
-    pub group_mgr: T,
-    pub group_infos: Vec<AnimationGroupRuntimeInfo>,
+    pub group_mgr: M,
+    // pub group_infos: Vec<AnimationGroupRuntimeInfo>,
+    pub group_infos: SecondaryMap<DefaultKey, AnimationGroupRuntimeInfo>,
     pub time_scale: f32,
+    mark: PhantomData<T>,
 }
 
-impl<A: AnimationManager, T: AnimationGroupManager> AnimationContextAmount<A, T> {
-    pub fn default(
-        animatable_target_id: IDAnimatableTarget,
-        animation_mgr: A,
-        group_mgr: T,
-    ) -> Self {
+impl<A: AnimationManager, T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<A, T, M> {
+    pub fn default(animation_mgr: A, group_mgr: M) -> Self {
         Self {
-            animatable_target_id,
             animation_mgr,
             group_mgr,
-            group_infos: vec![],
+            group_infos: SecondaryMap::default(),
             time_scale: 1.0,
+            mark: PhantomData,
         }
     }
     /// 添加 属性动画数据
@@ -140,32 +161,35 @@ impl<A: AnimationManager, T: AnimationGroupManager> AnimationContextAmount<A, T>
         ty: KeyFrameDataType,
     ) -> Result<AnimationID, EAnimationError> {
         match curve_infos.get(ty, curve_id) {
-            Ok(curve_info) => {
-                Ok(self.animation_mgr.create(attr, ty, curve_info, curve_id))
-            },
+            Ok(curve_info) => Ok(self.animation_mgr.create(attr, ty, curve_info, curve_id)),
             Err(e) => Err(e),
         }
     }
     /// 创建动画组
-    pub fn create_animation_group<R: IDAnimatableTargetAllocator>(
-        &mut self,
-        target_allocator: &mut R,
-    ) -> AnimationGroupID {
-        let id = self.group_mgr.create(target_allocator);
-        if id >= self.group_infos.len() {
-            self.group_infos.push(
-                AnimationGroupRuntimeInfo { last_amount_in_second: 0., amount_in_second: 0., looped_count: 0, is_playing: false, loop_event: false, start_event: false, end_event: false }
-            );
-        };
+    pub fn create_animation_group(&mut self) -> AnimationGroupID {
+        let id = self.group_mgr.create();
+        self.group_infos.insert(
+            id,
+            AnimationGroupRuntimeInfo {
+                last_amount_in_second: 0.,
+                amount_in_second: 0.,
+                looped_count: 0,
+                is_playing: false,
+                loop_event: false,
+                start_event: false,
+                end_event: false,
+            },
+        );
+        // if id >= self.group_infos.len() {
+        //     self.group_infos.push(
+        //         AnimationGroupRuntimeInfo { last_amount_in_second: 0., amount_in_second: 0., looped_count: 0, is_playing: false, loop_event: false, start_event: false, end_event: false }
+        //     );
+        // };
 
         id
     }
     /// 删除动画组
-    pub fn del_animation_group<R: IDAnimatableTargetAllocator>(
-        &mut self,
-        target_allocator: &mut R,
-        id: AnimationGroupID,
-    ) {
+    pub fn del_animation_group(&mut self, id: AnimationGroupID) {
         match self.group_infos.get_mut(id) {
             Some(group_info) => {
                 group_info.is_playing = false;
@@ -175,35 +199,24 @@ impl<A: AnimationManager, T: AnimationGroupManager> AnimationContextAmount<A, T>
                 group_info.start_event = false;
                 group_info.end_event = false;
                 group_info.loop_event = false;
-                self.group_mgr.del(target_allocator, id);
-            },
-            None => {},
+                self.group_mgr.del(id);
+            }
+            None => {}
         }
     }
     /// 为动画组添加 Target动画
-    pub fn add_target_animation<R: TAnimatableTargetId>(
+    pub fn add_target_animation(
         &mut self,
         animation: AnimationID,
         group_id: AnimationGroupID,
-        target: &R,
+        target: T,
     ) -> Result<(), EAnimationError> {
         match self.group_mgr.get_mut(group_id) {
-            Some(group) => {
-                match self.animation_mgr.get(animation) {
-                    Ok(animation) => {
-                        group.add_target_animation(
-                            TargetAnimation {
-                                target: target.anime_target_id(),
-                                animation,
-                            }
-                        )
-                    },
-                    Err(e) => {
-                        Err(e)
-                    },
-                }
+            Some(group) => match self.animation_mgr.get(animation) {
+                Ok(animation) => group.add_target_animation(TargetAnimation { target, animation }),
+                Err(e) => Err(e),
             },
-            None => Err(EAnimationError::AnimationGroupNotFound)
+            None => Err(EAnimationError::AnimationGroupNotFound),
         }
     }
     /// 启动动画组
@@ -218,27 +231,33 @@ impl<A: AnimationManager, T: AnimationGroupManager> AnimationContextAmount<A, T>
         frame_per_second: FramePerSecond,
         amount_calc: AnimationAmountCalc,
     ) -> Result<(), EAnimationError> {
-        match  self.group_infos.get_mut(id) {
+        match self.group_infos.get_mut(id) {
             Some(group_info) => match group_info.is_playing {
                 true => Err(EAnimationError::AnimationGroupHasStarted),
                 false => {
                     group_info.is_playing = true;
-                    self.group_mgr.get_mut(id).unwrap().start(is_loop, speed, loop_mode, from, to, frame_per_second, group_info, amount_calc);
+                    self.group_mgr.get_mut(id).unwrap().start(
+                        is_loop,
+                        speed,
+                        loop_mode,
+                        from,
+                        to,
+                        frame_per_second,
+                        group_info,
+                        amount_calc,
+                    );
                     Ok(())
-                },
+                }
             },
             None => Err(EAnimationError::AnimationGroupNotFound),
         }
     }
 
     /// 暂停动画组
-    pub fn pause(
-        &mut self,
-        id: AnimationGroupID,
-    ) -> Result<(), EAnimationError> {
-        match  self.group_infos.get_mut(id) {
+    pub fn pause(&mut self, id: AnimationGroupID) -> Result<(), EAnimationError> {
+        match self.group_infos.get_mut(id) {
             Some(group_info) => match group_info.is_playing {
-                true =>  {
+                true => {
                     group_info.is_playing = false;
                     group_info.amount_in_second = 0.;
                     group_info.last_amount_in_second = 0.;
@@ -247,7 +266,7 @@ impl<A: AnimationManager, T: AnimationGroupManager> AnimationContextAmount<A, T>
                     group_info.end_event = false;
                     group_info.loop_event = false;
                     Ok(())
-                },
+                }
                 false => Err(EAnimationError::AnimationGroupNotPlaying),
             },
             None => Err(EAnimationError::AnimationGroupNotFound),
@@ -255,13 +274,10 @@ impl<A: AnimationManager, T: AnimationGroupManager> AnimationContextAmount<A, T>
     }
 
     /// 停止动画组
-    pub fn stop(
-        &mut self,
-        id: AnimationGroupID,
-    ) -> Result<(), EAnimationError> {
-        match  self.group_infos.get_mut(id) {
+    pub fn stop(&mut self, id: AnimationGroupID) -> Result<(), EAnimationError> {
+        match self.group_infos.get_mut(id) {
             Some(group_info) => match group_info.is_playing {
-                true =>  {
+                true => {
                     group_info.is_playing = false;
                     group_info.amount_in_second = 0.;
                     group_info.last_amount_in_second = 0.;
@@ -273,10 +289,10 @@ impl<A: AnimationManager, T: AnimationGroupManager> AnimationContextAmount<A, T>
                         Some(group) => {
                             group.stop();
                             Ok(())
-                        },
-                        None => Err(EAnimationError::AnimationGroupNotFound)
+                        }
+                        None => Err(EAnimationError::AnimationGroupNotFound),
                     }
-                },
+                }
                 false => Err(EAnimationError::AnimationGroupNotPlaying),
             },
             None => Err(EAnimationError::AnimationGroupNotFound),
@@ -284,33 +300,40 @@ impl<A: AnimationManager, T: AnimationGroupManager> AnimationContextAmount<A, T>
     }
 
     /// 动画的曲线计算
-    pub fn anime_curve_calc(
-        &mut self,
-        delta_ms: u64,
-        runtime_infos: &mut RuntimeInfoMap,
-    ) {
+    pub fn anime_curve_calc(&mut self, delta_ms: u64, runtime_infos: &mut RuntimeInfoMap<T>) {
         let delta_ms = delta_ms as KeyFrameCurveValue * self.time_scale as KeyFrameCurveValue;
         let group_mgr = &mut self.group_mgr;
-        self.group_infos.iter_mut().enumerate().for_each(
-            |(i, group_info)| {
+        for (i, group_info) in self.group_infos.iter_mut() {
+            group_info.start_event = false;
+            group_info.end_event = false;
+            group_info.loop_event = false;
+            group_info.last_amount_in_second = group_info.amount_in_second;
 
-                group_info.start_event = false;
-                group_info.end_event = false;
-                group_info.loop_event = false;
-                group_info.last_amount_in_second = group_info.amount_in_second;
-
-                if group_info.is_playing == true {
-                    let group = group_mgr.get_mut(i).unwrap();
-                    group.anime(runtime_infos, delta_ms, group_info);
-                }
+            if group_info.is_playing == true {
+                let group = group_mgr.get_mut(i).unwrap();
+                group.anime(runtime_infos, delta_ms, group_info);
             }
-        );
+        }
+        // self.group_infos.iter_mut().enumerate().for_each(
+        //     |(i, group_info)| {
+
+        //         group_info.start_event = false;
+        //         group_info.end_event = false;
+        //         group_info.loop_event = false;
+        //         group_info.last_amount_in_second = group_info.amount_in_second;
+
+        //         if group_info.is_playing == true {
+        //             let group = group_mgr.get_mut(i).unwrap();
+        //             group.anime(runtime_infos, delta_ms, group_info);
+        //         }
+        //     }
+        // );
     }
 
     pub fn animation_event<E: Clone>(
         &self,
         listener: &mut AnimationListener<E>,
-        curve_frame_event: Option<&CurveFrameEvent<E>>
+        curve_frame_event: Option<&CurveFrameEvent<E>>,
     ) {
         match self.group_infos.get(listener.group) {
             Some(group_info) => {
@@ -325,19 +348,20 @@ impl<A: AnimationManager, T: AnimationGroupManager> AnimationContextAmount<A, T>
                 }
                 match curve_frame_event {
                     Some(frame_event) => {
-                        match frame_event.query(group_info.last_amount_in_second, group_info.amount_in_second) {
+                        match frame_event.query(
+                            group_info.last_amount_in_second,
+                            group_info.amount_in_second,
+                        ) {
                             Some(eventdatas) => {
                                 listener.on_frame(eventdatas);
-                            },
-                            None => {},
+                            }
+                            None => {}
                         }
-                    },
-                    None => {},
+                    }
+                    None => {}
                 }
-            },
-            None => {
-                
-            },
+            }
+            None => {}
         }
     }
 }
@@ -348,13 +372,15 @@ pub enum AnimationContextAmountAnimatableAttrSet {
 }
 
 /// 为 AnimationContextAmount 实现 TAnimatableTargetId
-impl<A: AnimationManager, T: AnimationGroupManager> TAnimatableTargetId for AnimationContextAmount<A, T> {
-    fn anime_target_id(&self) -> IDAnimatableTarget {
-        self.animatable_target_id
-    }
-}
+// impl<A: AnimationManager, T, M: AnimationGroupManager<T>> TAnimatableTargetId<T> for AnimationContextAmount<A, T, M> {
+//     fn anime_target_id(&self) -> T {
+//         self.animatable_target_id
+//     }
+// }
 /// 为 AnimationContextAmount 实现 TAnimatableTargetModifier
-impl<A: AnimationManager, T: AnimationGroupManager> TAnimatableTargetModifier<f32> for AnimationContextAmount<A, T> {
+impl<A: AnimationManager, T: Clone, M: AnimationGroupManager<T>> TAnimatableTargetModifier<f32>
+    for AnimationContextAmount<A, T, M>
+{
     fn anime_modify(&mut self, attr: IDAnimatableAttr, value: f32) -> Result<(), EAnimationError> {
         if attr == AnimationContextAmountAnimatableAttrSet::TimeScale as IDAnimatableAttr {
             self.time_scale = value;

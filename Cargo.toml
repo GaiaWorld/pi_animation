@@ -13,6 +13,7 @@ pi_slotmap = "0.1"
 pi_curves = { git = "https://github.com/GaiaWorld/pi_curves"}
 log = "0.4"
 env_logger = "0.9"
+serde = { version = "1.0", features = ["derive"], option=true }
 
 [patch."https://github.com/GaiaWorld/pi_curves"]
 pi_curves = { path = "../pi_curves"}

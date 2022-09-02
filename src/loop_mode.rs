@@ -1,6 +1,7 @@
 use pi_curves::curve::{frame::KeyFrameCurveValue};
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ELoopMode {
     /// 不循环
     Not             = 1,
@@ -12,6 +13,12 @@ pub enum ELoopMode {
     PositivePly     = 4,
     /// 反向反复循环
     OppositePly     = 5
+}
+
+impl Default for ELoopMode {
+    fn default() -> Self {
+        ELoopMode::Not
+    }
 }
 
 pub fn get_amount_calc(mode: ELoopMode) -> fn(KeyFrameCurveValue, KeyFrameCurveValue) -> (KeyFrameCurveValue, u16) {

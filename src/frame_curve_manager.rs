@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use pi_curves::curve::{FrameIndex, frame::{FrameDataValue, KeyFrameDataType}, frame_curve::FrameCurve, FramePerSecond};
+use pi_curves::curve::{
+    frame::{FrameDataValue, KeyFrameDataType},
+    frame_curve::FrameCurve,
+    FrameIndex, FramePerSecond,
+};
 
 use crate::error::EAnimationError;
 
@@ -15,12 +19,17 @@ pub trait TTypeFrameCurveInfoManager {
 pub trait TFrameCurveInfoManager {
     fn add_type(&mut self, ty: KeyFrameDataType) -> Result<(), EAnimationError>;
     fn insert(&mut self, ty: KeyFrameDataType, curve: FrameCurveInfo) -> FrameCurveInfoID;
-    fn remove(&mut self, ty: KeyFrameDataType, id: FrameCurveInfoID) -> Result<(), EAnimationError>;
-    fn get(&self, ty: KeyFrameDataType, id: FrameCurveInfoID) -> Result<FrameCurveInfo, EAnimationError>;
+    fn remove(&mut self, ty: KeyFrameDataType, id: FrameCurveInfoID)
+        -> Result<(), EAnimationError>;
+    fn get(
+        &self,
+        ty: KeyFrameDataType,
+        id: FrameCurveInfoID,
+    ) -> Result<FrameCurveInfo, EAnimationError>;
 }
 
 pub trait TFrameCurvePool<T: FrameDataValue> {
-    fn insert(&mut self, id: FrameCurveInfoID, curve: FrameCurve<T>,);
+    fn insert(&mut self, id: FrameCurveInfoID, curve: FrameCurve<T>);
     fn remove(&mut self, id: FrameCurveInfoID) -> Result<(), EAnimationError>;
     fn get(&self, id: FrameCurveInfoID) -> Result<Arc<FrameCurve<T>>, EAnimationError>;
 }
@@ -38,15 +47,16 @@ pub struct TypeFrameCurveInfoManager {
 
 impl TypeFrameCurveInfoManager {
     pub fn default() -> Self {
-        Self { id_pool: vec![], counter: 0, curve_infos: vec![] }
+        Self {
+            id_pool: vec![],
+            counter: 0,
+            curve_infos: vec![],
+        }
     }
 }
 
 impl TTypeFrameCurveInfoManager for TypeFrameCurveInfoManager {
-    fn insert(
-        &mut self,
-        curve: FrameCurveInfo,
-    ) -> FrameCurveInfoID {
+    fn insert(&mut self, curve: FrameCurveInfo) -> FrameCurveInfoID {
         let id = match self.id_pool.pop() {
             Some(id) => {
                 let info = self.curve_infos.get_mut(id).unwrap();
@@ -55,22 +65,19 @@ impl TTypeFrameCurveInfoManager for TypeFrameCurveInfoManager {
                 info.design_frame_per_second = curve.design_frame_per_second;
 
                 id
-            },
+            }
             None => {
                 let id = self.counter;
                 self.counter += 1;
 
                 self.curve_infos.push(curve);
                 id
-            },
+            }
         };
 
         id
     }
-    fn remove(
-        &mut self,
-        id: FrameCurveInfoID,
-    ) -> Result<(), EAnimationError> {
+    fn remove(&mut self, id: FrameCurveInfoID) -> Result<(), EAnimationError> {
         if id < self.counter {
             // 回收 ID
             if !self.id_pool.contains(&id) {
@@ -81,10 +88,7 @@ impl TTypeFrameCurveInfoManager for TypeFrameCurveInfoManager {
             Err(EAnimationError::FrameCurveNotFound)
         }
     }
-    fn get(
-        &self,
-        id: FrameCurveInfoID,
-    ) -> Result<FrameCurveInfo, EAnimationError> {
+    fn get(&self, id: FrameCurveInfoID) -> Result<FrameCurveInfo, EAnimationError> {
         match self.curve_infos.get(id) {
             Some(v) => Ok(*v),
             None => Err(EAnimationError::FrameCurveNotFound),
@@ -94,33 +98,26 @@ impl TTypeFrameCurveInfoManager for TypeFrameCurveInfoManager {
 
 /// 针对各种数据类型对应的帧曲线描述信息管理器
 /// * 第一层序号对应 数据类型 分配到的 KeyFrameDataType
-pub struct  FrameCurveInfoManager {
+pub struct FrameCurveInfoManager {
     list: Vec<TypeFrameCurveInfoManager>,
 }
 
 impl FrameCurveInfoManager {
     pub fn default() -> Self {
-        Self {
-            list: vec![],
-        }
+        Self { list: vec![] }
     }
 }
 
 impl TFrameCurveInfoManager for FrameCurveInfoManager {
-    fn add_type(
-        &mut self,
-        ty: KeyFrameDataType
-    ) -> Result<(), EAnimationError> {
-        if ty == self.list.len() {
-            self.list.push(TypeFrameCurveInfoManager::default());
+    fn add_type(&mut self, ty: KeyFrameDataType) -> Result<(), EAnimationError> {
+        if ty >= self.list.len() {
+            for _ in self.list.len()..ty + 1 {
+                self.list.push(TypeFrameCurveInfoManager::default());
+            }
         }
         Ok(())
     }
-    fn insert(
-        &mut self,
-        ty: KeyFrameDataType,
-        curve: FrameCurveInfo,
-    ) -> FrameCurveInfoID {
+    fn insert(&mut self, ty: KeyFrameDataType, curve: FrameCurveInfo) -> FrameCurveInfoID {
         self.list.get_mut(ty).unwrap().insert(curve)
     }
     fn remove(
@@ -129,12 +126,8 @@ impl TFrameCurveInfoManager for FrameCurveInfoManager {
         id: FrameCurveInfoID,
     ) -> Result<(), EAnimationError> {
         match self.list.get_mut(ty) {
-            Some(mgr) => {
-                mgr.remove(id)
-            },
-            None => {
-                Ok(())
-            },
+            Some(mgr) => mgr.remove(id),
+            None => Ok(()),
         }
     }
     fn get(
@@ -143,12 +136,8 @@ impl TFrameCurveInfoManager for FrameCurveInfoManager {
         id: FrameCurveInfoID,
     ) -> Result<FrameCurveInfo, EAnimationError> {
         match self.list.get(ty) {
-            Some(mgr) => {
-                mgr.get(id)
-            },
-            None => {
-                Err(EAnimationError::FrameCurveNotFound)
-            },
+            Some(mgr) => mgr.get(id),
+            None => Err(EAnimationError::FrameCurveNotFound),
         }
     }
 }
@@ -173,22 +162,20 @@ impl FrameCurveInfo {
             design_frame_per_second,
         }
     }
-    pub fn get_max_frame_for_running_speed(&self, running_frame_per_second: FramePerSecond) -> FramePerSecond {
-        (self.max_frame as f32 / self.design_frame_per_second as f32 * running_frame_per_second as f32) as FramePerSecond
-    }
-    pub fn max_frame(
+    pub fn get_max_frame_for_running_speed(
         &self,
-    ) -> FrameIndex {
+        running_frame_per_second: FramePerSecond,
+    ) -> FramePerSecond {
+        (self.max_frame as f32 / self.design_frame_per_second as f32
+            * running_frame_per_second as f32) as FramePerSecond
+    }
+    pub fn max_frame(&self) -> FrameIndex {
         self.max_frame
     }
-    pub fn min_frame(
-        &self,
-    ) -> FrameIndex {
+    pub fn min_frame(&self) -> FrameIndex {
         self.min_frame
     }
-    pub fn design_frame_per_second(
-        &self,
-    ) -> FrameIndex {
+    pub fn design_frame_per_second(&self) -> FrameIndex {
         self.design_frame_per_second
     }
 }
@@ -219,11 +206,7 @@ impl<T: FrameDataValue> FrameCurvePool<T> {
 }
 
 impl<T: FrameDataValue> TFrameCurvePool<T> for FrameCurvePool<T> {
-    fn insert(
-        &mut self,
-        id: FrameCurveInfoID,
-        curve: FrameCurve<T>,
-    ) {
+    fn insert(&mut self, id: FrameCurveInfoID, curve: FrameCurve<T>) {
         let arc = Arc::new(curve);
 
         self.infos.push(id);
@@ -231,30 +214,22 @@ impl<T: FrameDataValue> TFrameCurvePool<T> for FrameCurvePool<T> {
 
         // self.arcs.insert(id, arc);
     }
-    fn remove(
-        &mut self,
-        id: FrameCurveInfoID,
-    ) -> Result<(), EAnimationError> {
+    fn remove(&mut self, id: FrameCurveInfoID) -> Result<(), EAnimationError> {
         match self.infos.binary_search(&id) {
             Ok(index) => {
                 self.infos.swap_remove(index);
                 self.arcs.swap_remove(index);
                 Ok(())
-            },
+            }
             Err(_) => Err(EAnimationError::FrameCurveNotFound),
         }
 
         // self.arcs.remove(&id);
         // Ok(())
     }
-    fn get(
-        &self,
-        id: FrameCurveInfoID,
-    ) -> Result<Arc<FrameCurve<T>>, EAnimationError> {
+    fn get(&self, id: FrameCurveInfoID) -> Result<Arc<FrameCurve<T>>, EAnimationError> {
         match self.infos.binary_search(&id) {
-            Ok(index) => {
-                Ok(self.arcs.get(index).unwrap().clone())
-            },
+            Ok(index) => Ok(self.arcs.get(index).unwrap().clone()),
             Err(_) => Err(EAnimationError::FrameCurveNotFound),
         }
         // match self.arcs.get(&id) {
