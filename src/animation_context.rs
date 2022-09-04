@@ -219,11 +219,83 @@ impl<A: AnimationManager, T: Clone, M: AnimationGroupManager<T>> AnimationContex
             None => Err(EAnimationError::AnimationGroupNotFound),
         }
     }
+    /// 启动动画组 - 完整播放,不关心动画到底设计了多少帧
+    /// * `seconds` 播放时长 - 秒
+    /// * `loop_mode` 循环模式
+    /// * `amount_calc` 播放进度变化控制
+    pub fn start_complete(
+        &mut self,
+        id: AnimationGroupID,
+        seconds: KeyFrameCurveValue,
+        loop_mode: ELoopMode,
+        frame_per_second: FramePerSecond,
+        amount_calc: AnimationAmountCalc,
+    ) -> Result<(), EAnimationError> {
+        match self.group_infos.get_mut(id) {
+            Some(group_info) => match group_info.is_playing {
+                true => Err(EAnimationError::AnimationGroupHasStarted),
+                false => {
+                    group_info.is_playing = true;
+                    self.group_mgr.get_mut(id).unwrap().start_complete(
+                        seconds,
+                        loop_mode,
+                        frame_per_second,
+                        amount_calc,
+                        group_info,
+                    );
+                    Ok(())
+                }
+            },
+            None => Err(EAnimationError::AnimationGroupNotFound),
+        }
+    }
     /// 启动动画组
+    /// * `speed` 动画速度 - 正常速度为 1
+    /// * `loop_mode` 循环模式
+    /// * `from` 指定动画组的起始帧百分比位置 - 0~1
+    /// * `to` 指定动画组的结束帧百分比位置 - 0~1
+    /// * `frame_per_second` 指定动画组每秒运行多少帧 - 影响动画流畅度和计算性能
+    /// * `amount_calc` 播放进度变化控制
+    pub fn start_with_progress(
+        &mut self,
+        id: AnimationGroupID,
+        speed: KeyFrameCurveValue,
+        loop_mode: ELoopMode,
+        from: KeyFrameCurveValue,
+        to: KeyFrameCurveValue,
+        frame_per_second: FramePerSecond,
+        amount_calc: AnimationAmountCalc,
+    ) -> Result<(), EAnimationError> {
+        match self.group_infos.get_mut(id) {
+            Some(group_info) => match group_info.is_playing {
+                true => Err(EAnimationError::AnimationGroupHasStarted),
+                false => {
+                    group_info.is_playing = true;
+                    self.group_mgr.get_mut(id).unwrap().start_with_progress(
+                        speed,
+                        loop_mode,
+                        from,
+                        to,
+                        frame_per_second,
+                        group_info,
+                        amount_calc,
+                    );
+                    Ok(())
+                }
+            },
+            None => Err(EAnimationError::AnimationGroupNotFound),
+        }
+    }
+    /// 启动动画组
+    /// * `speed` 动画速度 - 正常速度为 1
+    /// * `loop_mode` 循环模式
+    /// * `from` 指定动画组的起始帧位置
+    /// * `to` 指定动画组的结束帧位置
+    /// * `frame_per_second` 指定动画组每秒运行多少帧 - 影响动画流畅度和计算性能
+    /// * `amount_calc` 播放进度变化控制
     pub fn start(
         &mut self,
         id: AnimationGroupID,
-        is_loop: bool,
         speed: KeyFrameCurveValue,
         loop_mode: ELoopMode,
         from: KeyFrameCurveValue,
@@ -237,7 +309,6 @@ impl<A: AnimationManager, T: Clone, M: AnimationGroupManager<T>> AnimationContex
                 false => {
                     group_info.is_playing = true;
                     self.group_mgr.get_mut(id).unwrap().start(
-                        is_loop,
                         speed,
                         loop_mode,
                         from,

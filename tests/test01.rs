@@ -210,7 +210,7 @@ mod test01 {
         // 向动画组添加 动画
         type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, target.anime_target_id());
         // 启动动画组
-        type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
+        type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
 
         // 动画运行
         type_animation_ctx_mgr.anime(100);
@@ -254,7 +254,7 @@ mod test01 {
         // 向动画组添加 动画
         type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, target.anime_target_id());
         // 启动动画组
-        type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
+        type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
 
 
         // 查询动画事件
@@ -323,7 +323,7 @@ mod test01 {
         // 向动画组添加 动画
         type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, target.anime_target_id());
         // 启动动画组
-        type_animation_ctx_mgr.animation_context_amount.start(group0, false, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::from_steps(5, EStepMode::JumpNone));
+        type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::from_steps(5, EStepMode::JumpNone));
 
         // 查询动画事件
         // 创建帧事件
@@ -413,7 +413,7 @@ mod test01 {
             for j in 0..group_animation_range {
                 type_animation_ctx_mgr.animation_context_amount.add_target_animation(i, group0, targets.get(j).unwrap().anime_target_id());
             }
-            type_animation_ctx_mgr.animation_context_amount.start(group0, true, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
+            type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
         }
  
         // 测试 动画性能 计 10w 个动画计算 & 10_000 个对象的数据修改

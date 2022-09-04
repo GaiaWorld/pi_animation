@@ -4,15 +4,15 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ELoopMode {
     /// 不循环
-    Not             = 1,
+    Not,
     /// 正向循环
-    Positive        = 2,
+    Positive(Option<u16>),
     /// 反向循环
-    Opposite        = 3,
+    Opposite(Option<u16>),
     /// 正向反复循环
-    PositivePly     = 4,
+    PositivePly(Option<u16>),
     /// 反向反复循环
-    OppositePly     = 5
+    OppositePly(Option<u16>),
 }
 
 impl Default for ELoopMode {
@@ -24,10 +24,10 @@ impl Default for ELoopMode {
 pub fn get_amount_calc(mode: ELoopMode) -> fn(KeyFrameCurveValue, KeyFrameCurveValue) -> (KeyFrameCurveValue, u16) {
     match mode {
         ELoopMode::Not => amount_not,
-        ELoopMode::Positive => amount_positive,
-        ELoopMode::Opposite => amount_opposite,
-        ELoopMode::PositivePly => amount_positive_ply,
-        ELoopMode::OppositePly => amount_opposite_ply,
+        ELoopMode::Positive(_) => amount_positive,
+        ELoopMode::Opposite(_) => amount_opposite,
+        ELoopMode::PositivePly(_) => amount_positive_ply,
+        ELoopMode::OppositePly(_) => amount_opposite_ply,
     }
 }
 
@@ -56,25 +56,27 @@ fn amount_opposite(once_time: KeyFrameCurveValue, delay_ms: KeyFrameCurveValue) 
 }
 
 fn amount_positive_ply(once_time: KeyFrameCurveValue, delay_ms: KeyFrameCurveValue) -> (KeyFrameCurveValue, u16) {
-    let loop_count = (delay_ms / once_time).floor();
+    let loop_count = (delay_ms / once_time).floor() as i32;
+    let result_count = loop_count / 2;
 
-    let amount = if loop_count <= 1. {
-        ((delay_ms as f32 - loop_count * once_time) / once_time as f32) as KeyFrameCurveValue
+    let amount = if loop_count != result_count * 2  {
+        1.0 - (delay_ms as KeyFrameCurveValue - loop_count as KeyFrameCurveValue * once_time) / once_time as KeyFrameCurveValue
     } else {
-        (1.0 - (delay_ms as f32 - loop_count * once_time) / once_time as f32) as KeyFrameCurveValue
+        (delay_ms as KeyFrameCurveValue - loop_count as KeyFrameCurveValue * once_time) / once_time as KeyFrameCurveValue
     };
 
-    (amount, (loop_count / 2.) as u16)
+    (amount, result_count as u16)
 }
 
 fn amount_opposite_ply(once_time: KeyFrameCurveValue, delay_ms: KeyFrameCurveValue) -> (KeyFrameCurveValue, u16) {
-    let loop_count = (delay_ms / once_time).floor();
+    let loop_count = (delay_ms / once_time).floor() as i32;
+    let result_count = loop_count / 2;
 
-    let amount = if loop_count < 1. {
-        ((delay_ms as f32 - loop_count * once_time) / once_time as f32) as KeyFrameCurveValue
+    let amount = if loop_count != result_count * 2 {
+        (delay_ms - loop_count as KeyFrameCurveValue * once_time) / once_time
     } else {
-        (1.0 - (delay_ms as f32 - loop_count * once_time) / once_time as f32) as KeyFrameCurveValue
+        1.0 - (delay_ms - loop_count as KeyFrameCurveValue * once_time) / once_time
     };
 
-    (amount, (loop_count / 2.) as u16)
+    (amount, result_count as u16)
 }

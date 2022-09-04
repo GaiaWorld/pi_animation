@@ -1,7 +1,9 @@
 use pi_curves::{curve::{frame::KeyFrameCurveValue, FramePerSecond, FrameIndex}};
 use pi_slotmap::{DefaultKey, Key};
 
-use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, amount::AnimationAmountCalc};
+use log::trace;
+
+use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, amount::AnimationAmountCalc, end_mode::EEndMode};
 
 pub type AnimationGroupID = DefaultKey;
 
@@ -31,9 +33,10 @@ pub struct AnimationGroup<T: Clone> {
     // animatable_target_id: T,
     id: AnimationGroupID,
     animations: Vec<TargetAnimation<T>>,
-    is_loop: bool,
+    loop_count: Option<u16>,
     /// 动画组速度
     pub speed: KeyFrameCurveValue,
+    pub end_mode: EEndMode,
     from: KeyFrameCurveValue,
     to: KeyFrameCurveValue,
     /// 动画组有效运行时间
@@ -42,10 +45,14 @@ pub struct AnimationGroup<T: Clone> {
     looped_count: u16,
     /// 动画组循环模式
     loop_mode: ELoopMode,
-    /// 每秒运行多少帧 - 速度为 1 的情况下
+    /// 设计每秒帧数据分辨率 - 速度为 1 的情况下
     frame_per_second: FramePerSecond,
+    /// 累计未运行动画的有效间隔时间
+    detal_ms_record: KeyFrameCurveValue,
+    /// 动画组运行的帧间隔时长
+    frame_ms: KeyFrameCurveValue,
     /// 动画组使用的动画集合中最大帧数
-    max_frame: FrameIndex,
+    max_frame: KeyFrameCurveValue,
     /// 动画组运行一次的时间 - ms
     once_time: KeyFrameCurveValue,
     is_playing: bool,
@@ -63,23 +70,30 @@ impl<T: Clone> AnimationGroup<T> {
             // animatable_target_id,
             id: AnimationGroupID::null(),
             animations: vec![],
-            is_loop: false,
+            loop_count: Some(1),
             speed: 1.,
             from: 0.,
             to: 1.,
             delay_time: 0.,
             looped_count: 0,
             loop_mode: ELoopMode::Not,
-            frame_per_second: 30,
-            max_frame: 0,
+            frame_per_second: 60,
+            frame_ms: 16.6,
+            detal_ms_record: 0.,
+            max_frame: 0.,
             once_time: 1.,
             is_playing: false,
             blend_weight: 1.0,
             amount_in_second: 0.,
-            
+            end_mode: EEndMode::KeepEnd,
             amount: get_amount_calc(ELoopMode::Not),
             amount_calc: AnimationAmountCalc::default(),
         }
+    }
+
+    /// 获取动画组整体的最大帧位置 - 可 用于 start 接口 from to 参数的参考
+    pub fn max_frame(&self) -> KeyFrameCurveValue {
+        self.max_frame
     }
 
 	/// 设置id
@@ -88,6 +102,7 @@ impl<T: Clone> AnimationGroup<T> {
 	}
 
     /// 动画组运行接口
+    /// * `delta_ms` 帧推的间隔时间
     pub fn anime(
         &mut self,
         runtime_infos: &mut RuntimeInfoMap<T>,
@@ -103,34 +118,50 @@ impl<T: Clone> AnimationGroup<T> {
                 group_info.start_event = true;
             }
 
-            let amount_call = &self.amount;
+            self.detal_ms_record += delta_ms;
+            log::debug!(">>>>>>>>>>>>>>>> detal_ms_record {}, frame_ms {}", self.detal_ms_record, self.frame_ms);
 
-            // println!("{}, {}", self.once_time, self.delay_time);
-
-            let (amount, loop_count) = amount_call(self.once_time, self.delay_time);
-
-            let anime_amount = self.amount_calc.calc(amount);
-            let amount_in_second = anime_amount + self.from / self.frame_per_second as KeyFrameCurveValue;
+            if group_info.start_event || self.detal_ms_record >= self.frame_ms {
+                let amount_call = &self.amount;
     
-            if self.is_loop {
-                group_info.loop_event = self.looped_count != loop_count;
-                group_info.looped_count = loop_count;
-                self.looped_count = loop_count;
-            } else {
-                if amount >= 1. {
-                    group_info.end_event = true;
-                    self.is_playing = false;
+                let (mut amount, loop_count) = amount_call(self.once_time, self.delay_time);
+
+                if self.looped_count != loop_count {
+                    match self.loop_count {
+                        Some(count) => {
+                            if count == loop_count {
+                                group_info.end_event = true;
+                                self.is_playing = false;
+
+                                (amount, _) = match self.end_mode {
+                                    EEndMode::KeepEnd => amount_call(self.once_time, self.once_time),
+                                    EEndMode::BackToStart => amount_call(self.once_time, 0.),
+                                }
+                            } else {
+                                group_info.loop_event = true;
+                            }
+                        },
+                        None => {
+                            group_info.loop_event = true;
+                        },
+                    }
                 }
+    
+                let anime_amount = self.amount_calc.calc(amount);
+                let amount_in_second = anime_amount + self.from / self.frame_per_second as KeyFrameCurveValue;
+    
+                log::debug!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time, self.delay_time, amount, anime_amount, amount_in_second);
+    
+                self.looped_count = loop_count;
+                self.amount_in_second = amount_in_second;
+    
+                group_info.amount_in_second = amount_in_second;
+        
+                self.update_to_infos(runtime_infos);
+
+                self.delay_time += self.detal_ms_record * self.speed;
+                self.detal_ms_record = 0.;
             }
-    
-            self.looped_count = loop_count;
-            self.amount_in_second = amount_in_second;
-
-            group_info.amount_in_second = amount_in_second;
-    
-            self.update_to_infos(runtime_infos);
-
-            self.delay_time += delta_ms * self.speed;
         }
     }
     /// 添加 目标动画
@@ -139,15 +170,37 @@ impl<T: Clone> AnimationGroup<T> {
         target_animation: TargetAnimation<T>,
     ) -> Result<(), EAnimationError> {
         // println!("{}", self.max_frame);
-        self.max_frame = FramePerSecond::max(self.max_frame, target_animation.animation.get_max_frame_for_running_speed(self.frame_per_second));
+        self.max_frame = KeyFrameCurveValue::max(self.max_frame, target_animation.animation.get_max_frame_for_running_speed(self.frame_per_second));
         // println!("add_target_animation {}", self.max_frame);
         self.animations.push(target_animation);
         Ok(())
     }
-    /// 启动动画组
-    pub fn start(
+    /// 启动动画组 - 完整播放,不关心动画到底设计了多少帧
+    /// * `seconds` 播放时长 - 秒
+    /// * `loop_mode` 循环模式
+    /// * `amount_calc` 播放进度变化控制
+    pub fn start_complete(
         &mut self,
-        is_loop: bool,
+        seconds: KeyFrameCurveValue,
+        loop_mode: ELoopMode,
+        frame_per_second: FramePerSecond,
+        amount_calc: AnimationAmountCalc,
+        group_info: &mut AnimationGroupRuntimeInfo,
+    ) {
+        let speed = 1.0 / seconds;
+        let from = 0.;
+        let to = self.max_frame as KeyFrameCurveValue;
+        self.start(speed, loop_mode, from, to, frame_per_second, group_info, amount_calc)
+    }
+    /// 启动动画组
+    /// * `speed` 动画速度 - 正常速度为 1
+    /// * `loop_mode` 循环模式
+    /// * `from` 指定动画组的起始帧百分比位置 - 0~1
+    /// * `to` 指定动画组的结束帧百分比位置 - 0~1
+    /// * `frame_per_second` 指定动画组每秒运行多少帧 - 影响动画流畅度和计算性能
+    /// * `amount_calc` 播放进度变化控制
+    pub fn start_with_progress(
+        &mut self,
         speed: KeyFrameCurveValue,
         loop_mode: ELoopMode,
         from: KeyFrameCurveValue,
@@ -156,10 +209,29 @@ impl<T: Clone> AnimationGroup<T> {
         group_info: &mut AnimationGroupRuntimeInfo,
         amount_calc: AnimationAmountCalc,
     ) {
-        self.is_loop = is_loop;
+        self.start(speed, loop_mode, from * self.max_frame, to * self.max_frame, frame_per_second, group_info, amount_calc)
+    }
+    /// 启动动画组
+    /// * `speed` 动画速度 - 正常速度为 1
+    /// * `loop_mode` 循环模式
+    /// * `from` 指定动画组的起始帧位置
+    /// * `to` 指定动画组的结束帧位置
+    /// * `frame_per_second` 指定动画组每秒运行多少帧 - 影响动画流畅度和计算性能
+    /// * `amount_calc` 播放进度变化控制
+    pub fn start(
+        &mut self,
+        speed: KeyFrameCurveValue,
+        loop_mode: ELoopMode,
+        from: KeyFrameCurveValue,
+        to: KeyFrameCurveValue,
+        frame_per_second: FramePerSecond,
+        group_info: &mut AnimationGroupRuntimeInfo,
+        amount_calc: AnimationAmountCalc,
+    ) {
         self.is_playing = true;
-        self.delay_time = 0.;
         self.speed = speed;
+        self.delay_time = 0.;
+        self.detal_ms_record = 0.;
 
         let (from, to) = (KeyFrameCurveValue::min(from, to), KeyFrameCurveValue::max(from, to));
         // println!("from {}, to {}", from, to);
@@ -174,13 +246,24 @@ impl<T: Clone> AnimationGroup<T> {
         self.amount_calc = amount_calc;
 
         match loop_mode {
-            ELoopMode::Opposite => {
+            ELoopMode::Opposite(v) => {
+                self.loop_count = v;
                 self.amount_in_second = to / self.frame_per_second as KeyFrameCurveValue;
             },
-            ELoopMode::OppositePly => {
+            ELoopMode::OppositePly(v) => {
+                self.loop_count = v;
                 self.amount_in_second = to / self.frame_per_second as KeyFrameCurveValue;
             },
-            _ => {
+            ELoopMode::Positive(v) => {
+                self.loop_count = v;
+                self.amount_in_second = from / self.frame_per_second as KeyFrameCurveValue;
+            },
+            ELoopMode::PositivePly(v) => {
+                self.loop_count = v;
+                self.amount_in_second = from / self.frame_per_second as KeyFrameCurveValue;
+            },
+            ELoopMode::Not => {
+                self.loop_count = Some(1);
                 self.amount_in_second = from / self.frame_per_second as KeyFrameCurveValue;
             },
         }
@@ -210,13 +293,13 @@ impl<T: Clone> AnimationGroup<T> {
         &mut self,
     ) {
         // println!("self.from {}, self.to {}", self.from, self.to);
-        self.once_time = (self.to - self.from) as KeyFrameCurveValue / self.frame_per_second as KeyFrameCurveValue / self.speed.abs() * 1000.0;
+        self.once_time = (self.to - self.from) as KeyFrameCurveValue / self.frame_per_second as KeyFrameCurveValue * 1000.0;
     }
     fn from(
         &mut self,
         from: KeyFrameCurveValue,
     ) {
-        self.from = KeyFrameCurveValue::max(0 as KeyFrameCurveValue, from as KeyFrameCurveValue);
+        self.from = KeyFrameCurveValue::max(0., from as KeyFrameCurveValue);
     }
     fn to(
         &mut self,
@@ -229,13 +312,10 @@ impl<T: Clone> AnimationGroup<T> {
         &mut self,
         frame_per_second: FramePerSecond,
     ) -> Result<(), EAnimationError> {
-        if self.frame_per_second == 0 {
+        if frame_per_second == 0 {
             Err(EAnimationError::AnimationFramePerSecondCannotZero)
         } else {
-            let max_frame = self.max_frame as f32 * (frame_per_second as f32 / self.frame_per_second as f32);
-    
-            self.frame_per_second = frame_per_second;
-            self.max_frame = max_frame as FrameIndex;
+            self.frame_ms = 1000. / frame_per_second as KeyFrameCurveValue;
 
             Ok(())
         }
@@ -259,7 +339,6 @@ impl<T: Clone> AnimationGroup<T> {
                 curve_id: anime.animation.curve_id(),
                 group_weight: self.blend_weight,
             };
-            // println!("{:?}", temp);
             runtime_infos.insert(anime.animation.ty(), temp);
         }
     }

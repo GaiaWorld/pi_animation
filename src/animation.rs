@@ -1,4 +1,4 @@
-use pi_curves::curve::{frame::{KeyFrameDataType}, FramePerSecond, FrameIndex};
+use pi_curves::curve::{frame::{KeyFrameDataType, KeyFrameCurveValue}, FramePerSecond, FrameIndex};
 
 use crate::{target_modifier::{IDAnimatableAttr}, error::EAnimationError, frame_curve_manager::{FrameCurveInfoID, FrameCurveInfo}};
 
@@ -28,9 +28,9 @@ pub struct AnimationInfo {
 }
 
 impl AnimationInfo {
-    pub fn get_max_frame_for_running_speed(&self, running_frame_per_second: FramePerSecond) -> FramePerSecond {
+    pub fn get_max_frame_for_running_speed(&self, running_frame_per_second: FramePerSecond) -> KeyFrameCurveValue {
         // println!("{:?}", self.curve_info);
-        (self.curve_info.max_frame() as f32 / self.curve_info.design_frame_per_second() as f32 * running_frame_per_second as f32) as FramePerSecond
+        self.curve_info.max_frame() as KeyFrameCurveValue / self.curve_info.design_frame_per_second() as KeyFrameCurveValue * running_frame_per_second as KeyFrameCurveValue
     }
     pub fn max_frame(
         &self,
