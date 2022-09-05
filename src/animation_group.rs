@@ -33,7 +33,7 @@ pub struct AnimationGroup<T: Clone> {
     // animatable_target_id: T,
     id: AnimationGroupID,
     animations: Vec<TargetAnimation<T>>,
-    loop_count: Option<u16>,
+    loop_count: Option<u32>,
     /// 动画组速度
     pub speed: KeyFrameCurveValue,
     pub end_mode: EEndMode,
@@ -42,7 +42,7 @@ pub struct AnimationGroup<T: Clone> {
     /// 动画组有效运行时间
     delay_time: KeyFrameCurveValue,
     /// 动画组循环记录
-    looped_count: u16,
+    looped_count: u32,
     /// 动画组循环模式
     loop_mode: ELoopMode,
     /// 设计每秒帧数据分辨率 - 速度为 1 的情况下
@@ -60,7 +60,7 @@ pub struct AnimationGroup<T: Clone> {
     blend_weight: f32,
     /// 动画组的在秒单位下的进度
     amount_in_second: KeyFrameCurveValue,
-    amount: fn(KeyFrameCurveValue, KeyFrameCurveValue) -> (KeyFrameCurveValue, u16),
+    amount: fn(KeyFrameCurveValue, KeyFrameCurveValue) -> (KeyFrameCurveValue, u32),
     amount_calc: AnimationAmountCalc,
 }
 
