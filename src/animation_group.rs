@@ -62,6 +62,8 @@ pub struct AnimationGroup<T: Clone> {
     amount_in_second: KeyFrameCurveValue,
     amount: fn(KeyFrameCurveValue, KeyFrameCurveValue) -> (KeyFrameCurveValue, u32),
     amount_calc: AnimationAmountCalc,
+    /// 是否为测试模式
+    pub debug: bool,
 }
 
 impl<T: Clone> AnimationGroup<T> {
@@ -88,6 +90,7 @@ impl<T: Clone> AnimationGroup<T> {
             end_mode: EEndMode::KeepEnd,
             amount: get_amount_calc(ELoopMode::Not),
             amount_calc: AnimationAmountCalc::default(),
+            debug: false,
         }
     }
 
@@ -111,8 +114,6 @@ impl<T: Clone> AnimationGroup<T> {
     ) {
         group_info.last_amount_in_second = self.amount_in_second;
 
-
-        // println!(">>>>>>{}", self.is_playing);
         if self.is_playing {
             if self.delay_time.abs() < 0.00001 {
                 group_info.start_event = true;
@@ -121,7 +122,7 @@ impl<T: Clone> AnimationGroup<T> {
             self.detal_ms_record += delta_ms;
             log::debug!(">>>>>>>>>>>>>>>> detal_ms_record {}, frame_ms {}", self.detal_ms_record, self.frame_ms);
 
-            if group_info.start_event || self.detal_ms_record >= self.frame_ms {
+            if group_info.start_event || self.detal_ms_record >= self.frame_ms || self.debug {
                 let amount_call = &self.amount;
     
                 let (mut amount, loop_count) = amount_call(self.once_time, self.delay_time);
@@ -133,9 +134,21 @@ impl<T: Clone> AnimationGroup<T> {
                                 group_info.end_event = true;
                                 self.is_playing = false;
 
-                                (amount, _) = match self.end_mode {
-                                    EEndMode::KeepEnd => amount_call(self.once_time, self.once_time),
-                                    EEndMode::BackToStart => amount_call(self.once_time, 0.),
+                                amount = match self.end_mode {
+                                    EEndMode::KeepEnd => match self.loop_mode {
+                                        ELoopMode::Not => 1.,
+                                        ELoopMode::Positive(_) => 1.,
+                                        ELoopMode::Opposite(_) => 0.,
+                                        ELoopMode::PositivePly(_) => 0.,
+                                        ELoopMode::OppositePly(_) => 1.,
+                                    },
+                                    EEndMode::BackToStart => match self.loop_mode {
+                                        ELoopMode::Not => 0.,
+                                        ELoopMode::Positive(_) => 0.,
+                                        ELoopMode::Opposite(_) => 1.,
+                                        ELoopMode::PositivePly(_) => 1.,
+                                        ELoopMode::OppositePly(_) => 0.,
+                                    },
                                 }
                             } else {
                                 group_info.loop_event = true;

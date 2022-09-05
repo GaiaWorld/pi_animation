@@ -415,16 +415,17 @@ mod test01 {
             }
             type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 60, AnimationAmountCalc::default());
         }
-
+        type_animation_ctx_mgr.animation_context_amount.debug(true);
         // 测试 动画性能 计 10w 个动画计算 & 10_000 个对象的数据修改
         b.iter(move || {
 
-            type_animation_ctx_mgr.anime(30);
+            type_animation_ctx_mgr.anime(1);
             // type_animation_ctx_mgr.anime_uncheck(1);
 
             for i in 0..group_animation_range {
                 let target = targets.get_mut(i).unwrap();
                 let results = type_animation_ctx_mgr.value0_result_pool.query_result(target.anime_target_id());
+                // println!("results {}", results.len());
 
                 results.iter().for_each(|value| {
                     target.anime_modify(value.attr, value.value);

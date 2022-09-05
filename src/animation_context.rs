@@ -74,7 +74,8 @@ impl<F: FrameDataValue> TypeAnimationContext<F> {
     ) -> Result<(), Vec<EAnimationError>> {
         let mut errs = vec![];
         let runtime_infos = runtime_infos.list.get(self.ty).unwrap();
-        log::trace!("anime, runtime_infos len: {}", runtime_infos.len());
+        // log::trace!("anime, runtime_infos len: {}", runtime_infos.len());
+        // println!("anime, runtime_infos len: {}", runtime_infos.len());
         for info in runtime_infos {
             let curve = self.curves.get(info.curve_id);
             match curve {
@@ -96,6 +97,7 @@ impl<F: FrameDataValue> TypeAnimationContext<F> {
         }
 
         if errs.len() > 0 {
+            // println!("Error Number {}", errs.len());
             Err(errs)
         } else {
             Ok(())
@@ -150,6 +152,16 @@ impl<A: AnimationManager, T: Clone, M: AnimationGroupManager<T>> AnimationContex
             group_infos: SecondaryMap::default(),
             time_scale: 1.0,
             mark: PhantomData,
+        }
+    }
+    /// 设置是否为Debug模式, 当Banch测试性能时设置true
+    pub fn debug(
+        &mut self,
+        flag: bool
+    ) {
+        for (i, _) in self.group_infos.iter_mut() {
+            let group = self.group_mgr.get_mut(i).unwrap();
+            group.debug = flag;
         }
     }
     /// 添加 属性动画数据
