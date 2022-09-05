@@ -26,8 +26,8 @@ impl<T: FrameDataValue> TypeAnimationResultPoolDefault<T>  {
     pub fn reset(
         &mut self,
     ) {
-		self.result.clear()
-        // self.result.iter_mut().for_each(|x| x.clear());
+		// self.result.clear()
+        self.result.iter_mut().for_each(|(k, x)| x.clear());
     }
     pub fn query_result(
         &mut self,
