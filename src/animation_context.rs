@@ -12,7 +12,7 @@ use crate::{
     animation::{AnimationID, AnimationManager},
     animation_group::{AnimationGroupID, AnimationGroupRuntimeInfo},
     animation_group_manager::AnimationGroupManager,
-    animation_listener::AnimationListener,
+    animation_listener::{AnimationListener, EAnimationEvent},
     animation_result_pool::TypeAnimationResultPool,
     curve_frame_event::CurveFrameEvent,
     error::EAnimationError,
@@ -141,6 +141,7 @@ pub struct AnimationContextAmount<A: AnimationManager, T: Clone, M: AnimationGro
     // pub group_infos: Vec<AnimationGroupRuntimeInfo>,
     pub group_infos: SecondaryMap<DefaultKey, AnimationGroupRuntimeInfo>,
     pub time_scale: f32,
+    pub group_events: Vec<(DefaultKey, EAnimationEvent, u32)>,
     mark: PhantomData<T>,
 }
 
@@ -151,6 +152,7 @@ impl<A: AnimationManager, T: Clone, M: AnimationGroupManager<T>> AnimationContex
             group_mgr,
             group_infos: SecondaryMap::default(),
             time_scale: 1.0,
+            group_events: vec![],
             mark: PhantomData,
         }
     }
@@ -384,6 +386,8 @@ impl<A: AnimationManager, T: Clone, M: AnimationGroupManager<T>> AnimationContex
 
     /// 动画的曲线计算
     pub fn anime_curve_calc(&mut self, delta_ms: u64, runtime_infos: &mut RuntimeInfoMap<T>) {
+        self.group_events.clear();
+
         let delta_ms = delta_ms as KeyFrameCurveValue * self.time_scale as KeyFrameCurveValue;
         let group_mgr = &mut self.group_mgr;
         for (i, group_info) in self.group_infos.iter_mut() {
@@ -395,6 +399,16 @@ impl<A: AnimationManager, T: Clone, M: AnimationGroupManager<T>> AnimationContex
             if group_info.is_playing == true {
                 let group = group_mgr.get_mut(i).unwrap();
                 group.anime(runtime_infos, delta_ms, group_info);
+            }
+
+            if group_info.start_event {
+                self.group_events.push((i, EAnimationEvent::Start, 0));
+            }
+            if group_info.end_event {
+                self.group_events.push((i, EAnimationEvent::End, 0));
+            }
+            if group_info.loop_event {
+                self.group_events.push((i, EAnimationEvent::Loop, group_info.looped_count as u32));
             }
         }
         // self.group_infos.iter_mut().enumerate().for_each(

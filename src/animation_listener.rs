@@ -7,7 +7,7 @@ pub enum EAnimationEventResult {
 
 pub type OnStart = Box<dyn Fn() -> Result<EAnimationEventResult, EAnimationError>>;
 pub type OnEnd = Box<dyn Fn() -> Result<EAnimationEventResult, EAnimationError>>;
-pub type OnLoop = Box<dyn Fn(u16) -> Result<EAnimationEventResult, EAnimationError>>;
+pub type OnLoop = Box<dyn Fn(u32) -> Result<EAnimationEventResult, EAnimationError>>;
 pub type OnFrameEvent<D> = Box<dyn Fn(Vec<D>) -> Result<EAnimationEventResult, EAnimationError>>;
 
 pub enum EAnimationEvent {
@@ -57,7 +57,7 @@ impl<D: Clone> AnimationListener<D> {
     }
     pub fn on_loop(
         &mut self,
-        loop_count: u16,
+        loop_count: u32,
     ) {
         match &self.on_loop {
             Some(call) => match call(loop_count) {

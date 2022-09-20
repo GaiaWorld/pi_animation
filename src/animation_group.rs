@@ -14,7 +14,7 @@ pub struct AnimationGroupRuntimeInfo {
     /// 在 秒 级比例下的进度
     pub amount_in_second: KeyFrameCurveValue,
     /// 循环次数
-    pub looped_count: u16,
+    pub looped_count: u32,
     /// 是否活动状态
     pub is_playing: bool,
     /// 是否触发 loop 事件
