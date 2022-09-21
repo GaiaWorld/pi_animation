@@ -1,5 +1,6 @@
 use crate::{animation_group::AnimationGroupID, error::EAnimationError};
 
+#[derive(Debug, Clone, Copy)]
 pub enum EAnimationEventResult {
     None,
     RemoveListen,
@@ -10,6 +11,7 @@ pub type OnEnd = Box<dyn Fn() -> Result<EAnimationEventResult, EAnimationError>>
 pub type OnLoop = Box<dyn Fn(u32) -> Result<EAnimationEventResult, EAnimationError>>;
 pub type OnFrameEvent<D> = Box<dyn Fn(Vec<D>) -> Result<EAnimationEventResult, EAnimationError>>;
 
+#[derive(Debug, Clone, Copy)]
 pub enum EAnimationEvent {
     None,
     Start,
