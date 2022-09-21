@@ -245,7 +245,9 @@ impl<T: Clone> AnimationGroup<T> {
         self.is_playing = true;
         self.speed = speed;
         self.delay_time = 0.;
+        self.looped_count = 0;
         self.detal_ms_record = 0.;
+        self.amount_in_second = 0.;
 
         let (from, to) = (KeyFrameCurveValue::min(from, to), KeyFrameCurveValue::max(from, to));
         // println!("from {}, to {}", from, to);
