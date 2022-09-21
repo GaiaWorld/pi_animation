@@ -120,7 +120,7 @@ impl<T: Clone> AnimationGroup<T> {
             }
 
             self.detal_ms_record += delta_ms;
-            log::debug!(">>>>>>>>>>>>>>>> detal_ms_record {}, frame_ms {}", self.detal_ms_record, self.frame_ms);
+            log::trace!(">>>>>>>>>>>>>>>> detal_ms_record {}, frame_ms {}", self.detal_ms_record, self.frame_ms);
 
             if group_info.start_event || self.detal_ms_record >= self.frame_ms || self.debug {
                 let amount_call = &self.amount;
@@ -163,7 +163,7 @@ impl<T: Clone> AnimationGroup<T> {
                 let anime_amount = self.amount_calc.calc(amount);
                 let amount_in_second = anime_amount + self.from / self.frame_per_second as KeyFrameCurveValue;
     
-                log::debug!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time, self.delay_time, amount, anime_amount, amount_in_second);
+                log::trace!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time, self.delay_time, amount, anime_amount, amount_in_second);
     
                 self.looped_count = loop_count;
                 self.amount_in_second = amount_in_second;
