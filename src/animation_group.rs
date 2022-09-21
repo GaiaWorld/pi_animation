@@ -130,7 +130,7 @@ impl<T: Clone> AnimationGroup<T> {
                 if self.looped_count != loop_count {
                     match self.loop_count {
                         Some(count) => {
-                            if count == loop_count {
+                            if count <= loop_count {
                                 group_info.end_event = true;
                                 self.is_playing = false;
 
