@@ -169,7 +169,8 @@ impl<T: Clone> AnimationGroup<T> {
                 self.amount_in_second = amount_in_second;
     
                 group_info.amount_in_second = amount_in_second;
-        
+                group_info.looped_count = loop_count;
+
                 self.update_to_infos(runtime_infos);
 
                 self.delay_time += self.detal_ms_record * self.speed;
