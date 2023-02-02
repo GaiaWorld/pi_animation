@@ -30,25 +30,15 @@ use crate::{
     },
 };
 
-pub trait TTypeFrameCurve<F: FrameDataValue> {
-    fn curve(&self) -> &FrameCurve<F>;
-}
-
-impl<F: FrameDataValue> TTypeFrameCurve<F> for FrameCurve<F> {
-    fn curve(&self) -> &FrameCurve<F> {
-        &self
-    }
-}
-
 /// 类型动画上下文 - 每种数据类型的动画实现一个
-pub struct TypeAnimationContext<F: FrameDataValue, D: TTypeFrameCurve<F>> {
+pub struct TypeAnimationContext<F: FrameDataValue, D: AsRef<FrameCurve<F>>> {
     ty: KeyFrameDataType,
     curves: Vec<Option<D>>,
     id_pool: Vec<usize>,
     pd: PhantomData<F>,
 }
 
-impl<F: FrameDataValue, D: TTypeFrameCurve<F>> TypeAnimationContext<F, D> {
+impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
     pub fn new<T: Clone>(
         ty: usize,
         runtime_info_map: &mut RuntimeInfoMap<T>,
@@ -70,7 +60,7 @@ impl<F: FrameDataValue, D: TTypeFrameCurve<F>> TypeAnimationContext<F, D> {
         attr: IDAnimatableAttr,
         curve: D,
     ) -> AnimationInfo {
-        let curve_info = FrameCurveInfo::from(curve.curve());
+        let curve_info = FrameCurveInfo::from(curve.as_ref());
         
         if let Some(index) = self.id_pool.pop() {
             let result = AnimationInfo {
@@ -111,7 +101,7 @@ impl<F: FrameDataValue, D: TTypeFrameCurve<F>> TypeAnimationContext<F, D> {
         for info in runtime_infos {
             if let Some(Some(curve)) = self.curves.get(info.curve_id) {
                 // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
-                let value = curve.curve().interple(info.amount_in_second);
+                let value = curve.as_ref().interple(info.amount_in_second);
                 let result = AnimeResult {
                     value,
                     attr: info.attr,
@@ -142,7 +132,7 @@ impl<F: FrameDataValue, D: TTypeFrameCurve<F>> TypeAnimationContext<F, D> {
         for info in runtime_infos {
             let curve = self.curves.get(info.curve_id).unwrap().as_ref().unwrap();
             // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
-            let value = curve.curve().interple(info.amount_in_second);
+            let value = curve.as_ref().interple(info.amount_in_second);
             let result = AnimeResult {
                 value,
                 attr: info.attr,

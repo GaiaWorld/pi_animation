@@ -3,7 +3,7 @@ extern crate test;
 
 use std::{ops::Add, sync::Arc};
 
-use pi_animation::{target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId, IDAnimatableTargetAllocator, IDAnimatableTargetAllocatorDefault}, error::EAnimationError, type_animation_context::{TypeAnimationContext, AnimationContextAmount, TTypeFrameCurve}, runtime_info::RuntimeInfoMap, frame_curve_manager::FrameCurveInfoManager, animation_result_pool::{TypeAnimationResultPoolDefault, TypeAnimationResultPool}, animation_group_manager::AnimationGroupManagerDefault};
+use pi_animation::{target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId, IDAnimatableTargetAllocator, IDAnimatableTargetAllocatorDefault}, error::EAnimationError, type_animation_context::{TypeAnimationContext, AnimationContextAmount}, runtime_info::RuntimeInfoMap, frame_curve_manager::FrameCurveInfoManager, animation_result_pool::{TypeAnimationResultPoolDefault, TypeAnimationResultPool}, animation_group_manager::AnimationGroupManagerDefault};
 use pi_curves::curve::{frame::{FrameValueScale, FrameDataValue, KeyFrameDataType, KeyFrameCurveValue, KeyFrameDataTypeAllocator}, frame_curve::FrameCurve};
 use pi_slotmap::{DefaultKey, SlotMap};
 
@@ -184,8 +184,8 @@ impl TypeAnimationContextMgr {
 
 #[derive(Debug, Clone)]
 pub struct AssetCurve<F: FrameDataValue>(pub Arc<FrameCurve<F>>);
-impl<F: FrameDataValue> TTypeFrameCurve<F> for AssetCurve<F> {
-    fn curve(&self) -> &FrameCurve<F> {
+impl<F: FrameDataValue> AsRef<FrameCurve<F>> for AssetCurve<F> {
+    fn as_ref(&self) -> &FrameCurve<F> {
         &self.0
     }
 }
