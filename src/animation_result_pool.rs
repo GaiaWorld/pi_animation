@@ -1,7 +1,7 @@
 use pi_curves::curve::frame::FrameDataValue;
-use pi_slotmap::{DefaultKey, SlotMap, SecondaryMap};
+use pi_slotmap::{DefaultKey, SecondaryMap};
 
-use crate::{target_modifier::{IDAnimatableTarget, IDAnimatableAttr}, error::EAnimationError};
+use crate::{target_modifier::{IDAnimatableAttr}, error::EAnimationError};
 
 
 #[derive(Debug, Clone, Copy)]
@@ -35,7 +35,7 @@ impl<T: FrameDataValue> TypeAnimationResultPoolDefault<T>  {
         &mut self,
     ) {
 		// self.result.clear()
-        self.result.iter_mut().for_each(|(k, x)| x.clear());
+        self.result.iter_mut().for_each(|(_, x)| x.clear());
     }
     pub fn query_result(
         &mut self,

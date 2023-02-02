@@ -1,6 +1,6 @@
 use pi_slotmap::{SlotMap, DefaultKey};
 
-use crate::{target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetId}, animation_group::{AnimationGroupID, AnimationGroup}, animation::AnimationInfo};
+use crate::{animation_group::{AnimationGroupID, AnimationGroup}, animation::AnimationInfo};
 
 
 pub trait AnimationGroupManager<T: Clone> {

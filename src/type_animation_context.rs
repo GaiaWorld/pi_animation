@@ -1,16 +1,16 @@
-use std::{fmt::Debug, marker::PhantomData, sync::Arc, hash::Hash};
+use std::{marker::PhantomData};
 
 use pi_curves::curve::{
-    frame::{FrameDataValue, KeyFrameCurveValue, KeyFrameDataType, KeyFrameDataTypeAllocator},
+    frame::{FrameDataValue, KeyFrameCurveValue, KeyFrameDataType},
     frame_curve::FrameCurve,
     FramePerSecond,
 };
-use pi_hash::XHashMap;
+
 use pi_slotmap::{DefaultKey, SecondaryMap};
 
 use crate::{
     amount::AnimationAmountCalc,
-    animation::{AnimationID, AnimationInfo},
+    animation::{AnimationInfo},
     animation_group::{AnimationGroupID, AnimationGroupRuntimeInfo},
     animation_group_manager::AnimationGroupManager,
     animation_listener::{AnimationListener, EAnimationEvent},
@@ -18,14 +18,13 @@ use crate::{
     curve_frame_event::CurveFrameEvent,
     error::EAnimationError,
     frame_curve_manager::{
-        FrameCurveInfoID, FrameCurveInfoManager, TFrameCurveInfoManager,
-        TFrameCurvePool, FrameCurveInfo,
+        FrameCurveInfo,
     },
     loop_mode::ELoopMode,
-    runtime_info::{RuntimeInfo, RuntimeInfoMap},
+    runtime_info::{RuntimeInfoMap},
     target_animation::TargetAnimation,
     target_modifier::{
-        IDAnimatableAttr, IDAnimatableTarget, IDAnimatableTargetAllocator, TAnimatableTargetId,
+        IDAnimatableAttr,
         TAnimatableTargetModifier,
     },
 };

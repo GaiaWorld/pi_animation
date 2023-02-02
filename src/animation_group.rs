@@ -1,9 +1,8 @@
-use pi_curves::{curve::{frame::KeyFrameCurveValue, FramePerSecond, FrameIndex}};
+use pi_curves::{curve::{frame::KeyFrameCurveValue, FramePerSecond}};
 use pi_slotmap::{DefaultKey, Key};
 
-use log::trace;
 
-use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, amount::AnimationAmountCalc, end_mode::EEndMode, animation::AnimationInfo};
+use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, amount::AnimationAmountCalc, end_mode::EEndMode, animation::AnimationInfo};
 
 pub type AnimationGroupID = DefaultKey;
 

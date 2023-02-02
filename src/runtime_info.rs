@@ -3,7 +3,7 @@ use pi_curves::curve::frame::{KeyFrameCurveValue, KeyFrameDataType};
 use crate::{
     error::EAnimationError,
     frame_curve_manager::FrameCurveInfoID,
-    target_modifier::{IDAnimatableAttr, IDAnimatableTarget},
+    target_modifier::{IDAnimatableAttr},
 };
 
 /// 一个动画的运行时数据

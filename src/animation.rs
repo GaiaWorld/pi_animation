@@ -1,6 +1,6 @@
 use pi_curves::curve::{frame::{KeyFrameDataType, KeyFrameCurveValue}, FramePerSecond, FrameIndex};
 
-use crate::{target_modifier::{IDAnimatableAttr}, error::EAnimationError, frame_curve_manager::{FrameCurveInfoID, FrameCurveInfo}};
+use crate::{target_modifier::{IDAnimatableAttr}, frame_curve_manager::{FrameCurveInfoID, FrameCurveInfo}};
 
 pub type AnimationID = usize;
 
