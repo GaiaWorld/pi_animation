@@ -91,11 +91,11 @@ impl TAnimatableTargetModifier<f32> for Target0 {
 
 ////////////////////////////////////////////////////////////////
 pub struct TypeAnimationContextMgr {
-    pub value0_ctx: TypeAnimationContext<usize, Value0, AssetCurve<Value0>>,
+    pub value0_ctx: TypeAnimationContext<Value0, AssetCurve<Value0>>,
     pub value0_result_pool: TypeAnimationResultPoolDefault<Value0>,
-    pub value1_ctx: TypeAnimationContext<usize, Value1, AssetCurve<Value1>>,
+    pub value1_ctx: TypeAnimationContext<Value1, AssetCurve<Value1>>,
     pub value1_result_pool: TypeAnimationResultPoolDefault<Value1>,
-    pub f32_ctx: TypeAnimationContext<usize, f32, AssetCurve<f32>>,
+    pub f32_ctx: TypeAnimationContext<f32, AssetCurve<f32>>,
     pub f32_result_pool: TypeAnimationResultPoolDefault<f32>,
     pub runtime_infos: RuntimeInfoMap<DefaultKey>,
     pub curve_infos: FrameCurveInfoManager,
@@ -194,7 +194,7 @@ impl<F: FrameDataValue> TTypeFrameCurve<F> for AssetCurve<F> {
 mod test01 {
     use std::sync::Arc;
 
-    use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc, frame_curve_manager::FrameCurvePool};
+    use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc};
     use pi_curves::{curve::{frame_curve::FrameCurve, FrameIndex, frame::KeyFrameCurveValue}, easing::EEasingMode, steps::EStepMode};
     use pi_slotmap::SlotMap;
     use test::{Bencher};

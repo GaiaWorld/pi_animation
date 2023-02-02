@@ -1,125 +1,30 @@
-use std::{fmt::Debug, marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData};
 
 use pi_curves::curve::{
-    frame::{FrameDataValue, KeyFrameCurveValue, KeyFrameDataType, KeyFrameDataTypeAllocator},
-    frame_curve::FrameCurve,
+    frame::{KeyFrameCurveValue, KeyFrameDataType},
     FramePerSecond,
 };
 use pi_slotmap::{DefaultKey, SecondaryMap};
 
 use crate::{
     amount::AnimationAmountCalc,
-    animation::{AnimationID, AnimationInfo},
+    animation::{AnimationInfo},
     animation_group::{AnimationGroupID, AnimationGroupRuntimeInfo},
     animation_group_manager::AnimationGroupManager,
     animation_listener::{AnimationListener, EAnimationEvent},
-    animation_result_pool::{TypeAnimationResultPool, AnimeResult},
     curve_frame_event::CurveFrameEvent,
     error::EAnimationError,
     frame_curve_manager::{
-        FrameCurveInfoID, FrameCurveInfoManager, FrameCurvePool, TFrameCurveInfoManager,
-        TFrameCurvePool,
+        FrameCurveInfoID, FrameCurveInfoManager, TFrameCurveInfoManager,
     },
     loop_mode::ELoopMode,
-    runtime_info::{RuntimeInfo, RuntimeInfoMap},
+    runtime_info::{RuntimeInfoMap},
     target_animation::TargetAnimation,
     target_modifier::{
-        IDAnimatableAttr, IDAnimatableTarget, IDAnimatableTargetAllocator, TAnimatableTargetId,
+        IDAnimatableAttr,
         TAnimatableTargetModifier,
     },
 };
-
-/// 类型动画上下文 - 每种数据类型的动画实现一个
-pub struct TypeAnimationContext<T: FrameDataValue> {
-    ty: KeyFrameDataType,
-    curves: FrameCurvePool<T>,
-}
-
-impl<F: FrameDataValue> TypeAnimationContext<F> {
-    pub fn new<T: Clone>(
-        ty: usize,
-        runtime_info_map: &mut RuntimeInfoMap<T>,
-        curve_infos: &mut FrameCurveInfoManager,
-    ) -> Self {
-        runtime_info_map.add_type(ty);
-        curve_infos.add_type(ty);
-        Self {
-            ty,
-            curves: FrameCurvePool::default(),
-        }
-    }
-    /// 添加 动画曲线数据
-    pub fn add_frame_curve(
-        &mut self,
-        curve_infos: &mut FrameCurveInfoManager,
-        curve: Arc<FrameCurve<F>>,
-    ) -> FrameCurveInfoID {
-        let id = curve_infos.insert(self.ty, FrameCurvePool::curve_info(&curve));
-        self.curves.insert(id, curve);
-
-        id
-    }
-    /// 使用曲线计算结果 计算属性值
-    pub fn anime<T: Clone, R: TypeAnimationResultPool<F, T>>(
-        &self,
-        runtime_infos: &RuntimeInfoMap<T>,
-        result_pool: &mut R,
-    ) -> Result<(), Vec<EAnimationError>> {
-        let mut errs = vec![];
-        let runtime_infos = runtime_infos.list.get(self.ty).unwrap();
-        // log::trace!("anime, runtime_infos len: {}", runtime_infos.len());
-        // println!("anime, runtime_infos len: {}", runtime_infos.len());
-        for info in runtime_infos {
-            let curve = self.curves.get(info.curve_id);
-            match curve {
-                Ok(curve) => {
-                    // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
-                    let value = curve.interple(info.amount_in_second);
-                    let result = AnimeResult {
-                        value,
-                        attr: info.attr,
-                        weight: info.group_weight,
-                    };
-                    match result_pool.record_result(info.target.clone(), info.attr, result) {
-                        Ok(_) => {}
-                        Err(e) => errs.push(e),
-                    }
-                }
-                Err(e) => errs.push(e),
-            }
-        }
-
-        if errs.len() > 0 {
-            // println!("Error Number {}", errs.len());
-            Err(errs)
-        } else {
-            Ok(())
-        }
-    }
-
-    /// 使用曲线计算结果 计算属性值
-    pub fn anime_uncheck<T: Clone, R: TypeAnimationResultPool<F, T>>(
-        &self,
-        runtime_infos: &RuntimeInfoMap<T>,
-        result_pool: &mut R,
-    ) {
-        let runtime_infos = runtime_infos.list.get(self.ty).unwrap();
-        for info in runtime_infos {
-            let curve = self.curves.get(info.curve_id).unwrap();
-            // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
-            let value = curve.interple(info.amount_in_second);
-            let result = AnimeResult {
-                value,
-                attr: info.attr,
-                weight: info.group_weight,
-            };
-            result_pool.record_result(info.target.clone(), info.attr, result);
-        }
-    }
-    pub fn ty(&self) -> KeyFrameDataType {
-        self.ty
-    }
-}
 
 /// 动画进度计算上下文
 /// * 运行所有活动动画组

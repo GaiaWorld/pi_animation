@@ -18,8 +18,8 @@ use crate::{
     curve_frame_event::CurveFrameEvent,
     error::EAnimationError,
     frame_curve_manager::{
-        FrameCurveInfoID, FrameCurveInfoManager, FrameCurvePool, TFrameCurveInfoManager,
-        TFrameCurvePool,
+        FrameCurveInfoID, FrameCurveInfoManager, TFrameCurveInfoManager,
+        TFrameCurvePool, FrameCurveInfo,
     },
     loop_mode::ELoopMode,
     runtime_info::{RuntimeInfo, RuntimeInfoMap},
@@ -41,16 +41,14 @@ impl<F: FrameDataValue> TTypeFrameCurve<F> for FrameCurve<F> {
 }
 
 /// 类型动画上下文 - 每种数据类型的动画实现一个
-pub struct TypeAnimationContext<K: Clone + Hash + PartialEq + Eq, F: FrameDataValue, D: TTypeFrameCurve<F>> {
+pub struct TypeAnimationContext<F: FrameDataValue, D: TTypeFrameCurve<F>> {
     ty: KeyFrameDataType,
-    /// 记录使用的曲线名称, 在数组中的序号即anime的ID
-    curve_usage: XHashMap<K, usize>,
     curves: Vec<Option<D>>,
     id_pool: Vec<usize>,
     pd: PhantomData<F>,
 }
 
-impl<K: Clone + Hash + PartialEq + Eq, F: FrameDataValue, D: TTypeFrameCurve<F>> TypeAnimationContext<K, F, D> {
+impl<F: FrameDataValue, D: TTypeFrameCurve<F>> TypeAnimationContext<F, D> {
     pub fn new<T: Clone>(
         ty: usize,
         runtime_info_map: &mut RuntimeInfoMap<T>,
@@ -59,7 +57,6 @@ impl<K: Clone + Hash + PartialEq + Eq, F: FrameDataValue, D: TTypeFrameCurve<F>>
         Self {
             ty,
             curves: vec![],
-            curve_usage: XHashMap::default(),
             id_pool: vec![],
             pd: PhantomData::default()
         }
@@ -73,7 +70,7 @@ impl<K: Clone + Hash + PartialEq + Eq, F: FrameDataValue, D: TTypeFrameCurve<F>>
         attr: IDAnimatableAttr,
         curve: D,
     ) -> AnimationInfo {
-        let curve_info = FrameCurvePool::curve_info(curve.curve());
+        let curve_info = FrameCurveInfo::from(curve.curve());
         
         if let Some(index) = self.id_pool.pop() {
             let result = AnimationInfo {
@@ -173,6 +170,17 @@ impl<K: Clone + Hash + PartialEq + Eq, F: FrameDataValue, D: TTypeFrameCurve<F>>
         });
     }
 
+    /// 移除动画对应的曲线信息
+    /// * animations 为 AnimationContextAmount.del_animation_group 的返回值
+    pub fn remove_one(
+        &mut self,
+        animation: &AnimationInfo,
+    ) {
+        if animation.ty == self.ty {
+            self.curves[animation.curve_id] = None;
+            self.id_pool.push(animation.curve_id);
+        }
+    }
 }
 
 /// 动画进度计算上下文

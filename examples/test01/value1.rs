@@ -1,6 +1,5 @@
 use std::ops::Add;
 
-use pi_animation::animation_context::TypeAnimationContext;
 use pi_curves::curve::frame::{FrameValueScale, KeyFrameCurveValue, KeyFrameDataType, FrameDataValue};
 
 #[derive(Debug, Clone, Copy)]

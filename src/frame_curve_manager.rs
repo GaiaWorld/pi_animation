@@ -149,8 +149,8 @@ pub struct FrameCurveInfo {
     min_frame: FrameIndex,
     design_frame_per_second: FramePerSecond,
 }
-impl<T: FrameDataValue> From<Arc<FrameCurve<T>>> for FrameCurveInfo {
-    fn from(value: Arc<FrameCurve<T>>) -> Self {
+impl<T: FrameDataValue> From<&FrameCurve<T>> for FrameCurveInfo {
+    fn from(value: &FrameCurve<T>) -> Self {
         Self {
             max_frame: value.max_frame,
             min_frame: value.min_frame,
@@ -185,66 +185,5 @@ impl FrameCurveInfo {
     }
     pub fn design_frame_per_second(&self) -> FrameIndex {
         self.design_frame_per_second
-    }
-}
-
-/// 对应动画数据类型的一个曲线池
-/// 存放序号由 FrameCurveInfoManager 分配获得
-pub struct FrameCurvePool<T: FrameDataValue> {
-    arcs: Vec<Arc<FrameCurve<T>>>,
-    infos: Vec<FrameCurveInfoID>,
-    // arcs: XHashMap<FrameCurveInfoID, Arc<FrameCurve<T>>>,
-}
-
-impl<T: FrameDataValue> FrameCurvePool<T> {
-    pub fn curve_info(curve: &FrameCurve<T>) -> FrameCurveInfo {
-        FrameCurveInfo {
-            max_frame: curve.max_frame,
-            min_frame: curve.min_frame,
-            design_frame_per_second: curve.design_frame_per_second,
-        }
-    }
-    pub fn default() -> Self {
-        Self {
-            arcs: vec![],
-            infos: vec![],
-            // arcs: XHashMap::default(),
-        }
-    }
-}
-
-impl<T: FrameDataValue> TFrameCurvePool<T> for FrameCurvePool<T> {
-    fn insert(&mut self, id: FrameCurveInfoID, curve: Arc<FrameCurve<T>>) {
-        let arc = curve;
-
-        self.infos.push(id);
-        self.arcs.push(arc);
-
-        // self.arcs.insert(id, arc);
-    }
-    fn remove(&mut self, id: FrameCurveInfoID) -> Result<(), EAnimationError> {
-        match self.infos.binary_search(&id) {
-            Ok(index) => {
-                self.infos.swap_remove(index);
-                self.arcs.swap_remove(index);
-                Ok(())
-            }
-            Err(_) => Err(EAnimationError::FrameCurveNotFound),
-        }
-
-        // self.arcs.remove(&id);
-        // Ok(())
-    }
-    fn get(&self, id: FrameCurveInfoID) -> Result<Arc<FrameCurve<T>>, EAnimationError> {
-        match self.infos.binary_search(&id) {
-            Ok(index) => Ok(self.arcs.get(index).unwrap().clone()),
-            Err(_) => Err(EAnimationError::FrameCurveNotFound),
-        }
-        // match self.arcs.get(&id) {
-        //     Some(v) => {
-        //         Ok(v.clone())
-        //     },
-        //     None => Err(EAnimationError::FrameCurveNotFound),
-        // }
     }
 }
