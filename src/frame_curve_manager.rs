@@ -96,52 +96,6 @@ impl TTypeFrameCurveInfoManager for TypeFrameCurveInfoManager {
     }
 }
 
-/// 针对各种数据类型对应的帧曲线描述信息管理器
-/// * 第一层序号对应 数据类型 分配到的 KeyFrameDataType
-pub struct FrameCurveInfoManager {
-    list: Vec<TypeFrameCurveInfoManager>,
-}
-
-impl FrameCurveInfoManager {
-    pub fn default() -> Self {
-        Self { list: vec![] }
-    }
-}
-
-impl TFrameCurveInfoManager for FrameCurveInfoManager {
-    fn add_type(&mut self, ty: KeyFrameDataType) -> Result<(), EAnimationError> {
-        if ty >= self.list.len() {
-            for _ in self.list.len()..ty + 1 {
-                self.list.push(TypeFrameCurveInfoManager::default());
-            }
-        }
-        Ok(())
-    }
-    fn insert(&mut self, ty: KeyFrameDataType, curve: FrameCurveInfo) -> FrameCurveInfoID {
-        self.list.get_mut(ty).unwrap().insert(curve)
-    }
-    fn remove(
-        &mut self,
-        ty: KeyFrameDataType,
-        id: FrameCurveInfoID,
-    ) -> Result<(), EAnimationError> {
-        match self.list.get_mut(ty) {
-            Some(mgr) => mgr.remove(id),
-            None => Ok(()),
-        }
-    }
-    fn get(
-        &self,
-        ty: KeyFrameDataType,
-        id: FrameCurveInfoID,
-    ) -> Result<FrameCurveInfo, EAnimationError> {
-        match self.list.get(ty) {
-            Some(mgr) => mgr.get(id),
-            None => Err(EAnimationError::FrameCurveNotFound),
-        }
-    }
-}
-
 /// 关键帧曲线描述信息
 #[derive(Debug, Clone, Copy)]
 pub struct FrameCurveInfo {

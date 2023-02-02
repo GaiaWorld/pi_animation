@@ -1,7 +1,7 @@
 use std::{marker::PhantomData};
 
 use pi_curves::curve::{
-    frame::{KeyFrameCurveValue, KeyFrameDataType},
+    frame::{KeyFrameCurveValue},
     FramePerSecond,
 };
 use pi_slotmap::{DefaultKey, SecondaryMap};
@@ -14,9 +14,6 @@ use crate::{
     animation_listener::{AnimationListener, EAnimationEvent},
     curve_frame_event::CurveFrameEvent,
     error::EAnimationError,
-    frame_curve_manager::{
-        FrameCurveInfoID, FrameCurveInfoManager, TFrameCurveInfoManager,
-    },
     loop_mode::ELoopMode,
     runtime_info::{RuntimeInfoMap},
     target_animation::TargetAnimation,
@@ -60,19 +57,6 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
         for (i, _) in self.group_infos.iter_mut() {
             let group = self.group_mgr.get_mut(i).unwrap();
             group.debug = flag;
-        }
-    }
-    /// 添加 属性动画数据
-    pub fn create_animation(
-        &mut self,
-        curve_infos: &mut FrameCurveInfoManager,
-        curve_id: FrameCurveInfoID,
-        attr: IDAnimatableAttr,
-        ty: KeyFrameDataType,
-    ) -> Result<AnimationInfo, EAnimationError> {
-        match curve_infos.get(ty, curve_id) {
-            Ok(curve_info) => Ok(AnimationInfo { attr, ty, curve_info, curve_id }),
-            Err(e) => Err(e),
         }
     }
     /// 创建动画组

@@ -3,8 +3,8 @@ extern crate test;
 
 use std::{ops::Add, sync::Arc};
 
-use pi_animation::{target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId, IDAnimatableTargetAllocator, IDAnimatableTargetAllocatorDefault}, error::EAnimationError, type_animation_context::{TypeAnimationContext, AnimationContextAmount}, runtime_info::RuntimeInfoMap, frame_curve_manager::FrameCurveInfoManager, animation_result_pool::{TypeAnimationResultPoolDefault, TypeAnimationResultPool}, animation_group_manager::AnimationGroupManagerDefault};
-use pi_curves::curve::{frame::{FrameValueScale, FrameDataValue, KeyFrameDataType, KeyFrameCurveValue, KeyFrameDataTypeAllocator}, frame_curve::FrameCurve};
+use pi_animation::{target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr, TAnimatableTargetId}, error::EAnimationError, type_animation_context::{TypeAnimationContext, AnimationContextAmount}, runtime_info::RuntimeInfoMap, animation_result_pool::{TypeAnimationResultPoolDefault, TypeAnimationResultPool}, animation_group_manager::AnimationGroupManagerDefault};
+use pi_curves::curve::{frame::{FrameValueScale, FrameDataValue, KeyFrameCurveValue, KeyFrameDataTypeAllocator}, frame_curve::FrameCurve};
 use pi_slotmap::{DefaultKey, SlotMap};
 
 ////////////////////////////////////////////////////////////////
@@ -98,7 +98,7 @@ pub struct TypeAnimationContextMgr {
     pub f32_ctx: TypeAnimationContext<f32, AssetCurve<f32>>,
     pub f32_result_pool: TypeAnimationResultPoolDefault<f32>,
     pub runtime_infos: RuntimeInfoMap<DefaultKey>,
-    pub curve_infos: FrameCurveInfoManager,
+    // pub curve_infos: FrameCurveInfoManager,
     // pub target_allocator: IDAnimatableTargetAllocatorDefault,
 	pub target_allocator: SlotMap<DefaultKey, ()>,
     pub ty_allocator: KeyFrameDataTypeAllocator,
@@ -108,7 +108,7 @@ pub struct TypeAnimationContextMgr {
 impl TypeAnimationContextMgr {
     pub fn default() -> Self {
         let mut runtime_infos = RuntimeInfoMap::default();
-        let mut curve_infos = FrameCurveInfoManager::default();
+        // let mut curve_infos = FrameCurveInfoManager::default();
         let mut target_allocator = SlotMap::default();
         let mut animation_context_amount = AnimationContextAmount::default(AnimationGroupManagerDefault::default());
         let mut ty_allocator = KeyFrameDataTypeAllocator::default();
@@ -125,7 +125,9 @@ impl TypeAnimationContextMgr {
             value0_ctx, value0_result_pool,
             value1_ctx, value1_result_pool,
             f32_ctx, f32_result_pool,
-            runtime_infos, curve_infos, target_allocator, animation_context_amount, ty_allocator,  }
+            runtime_infos,
+            // curve_infos,
+            target_allocator, animation_context_amount, ty_allocator,  }
     }
 
     /// 运行动画
