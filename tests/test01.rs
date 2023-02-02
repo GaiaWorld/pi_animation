@@ -214,7 +214,7 @@ mod test01 {
         let key_curve1 = 0;
         let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
         let curve1 = crate::AssetCurve::<f32>(Arc::new(curve1));
-        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, key_curve1, curve1);
+        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, curve1);
 
         // 创建动画组
         let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
@@ -258,7 +258,7 @@ mod test01 {
         let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
         let curve1 = crate::AssetCurve::<f32>(Arc::new(curve1));
         // 创建属性动画
-        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, key_curve1, curve1);
+        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, curve1);
 
         // 创建动画组
         let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
@@ -327,7 +327,7 @@ mod test01 {
         let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
         let curve1 = crate::AssetCurve::<f32>(Arc::new(curve1));
         // 创建属性动画
-        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, key_curve1, curve1);
+        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, curve1);
 
         // 创建动画组
         let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
@@ -413,10 +413,10 @@ mod test01 {
             for j in 0..group_animation_range {
                 let animation = if j % 2 == 0 {
                     // 创建属性动画
-                    type_animation_ctx_mgr.value0_ctx.create_animation(Target0AnimatableAttrSet::V0 as IDAnimatableAttr, key_curve0, curve0.clone())
+                    type_animation_ctx_mgr.value0_ctx.create_animation(Target0AnimatableAttrSet::V0 as IDAnimatableAttr, curve0.clone())
                 } else {
                     // 创建属性动画
-                    type_animation_ctx_mgr.value0_ctx.create_animation(Target0AnimatableAttrSet::V0a as IDAnimatableAttr, key_curve1, curve1.clone())
+                    type_animation_ctx_mgr.value0_ctx.create_animation(Target0AnimatableAttrSet::V0a as IDAnimatableAttr, curve1.clone())
                 };
                 type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation, group0, targets.get(j).unwrap().anime_target_id());
             }

@@ -3,7 +3,7 @@ use pi_slotmap::{DefaultKey, Key};
 
 use log::trace;
 
-use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, amount::AnimationAmountCalc, end_mode::EEndMode};
+use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{IDAnimatableTarget, TAnimatableTargetId, TAnimatableTargetModifier, IDAnimatableAttr}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, amount::AnimationAmountCalc, end_mode::EEndMode, animation::AnimationInfo};
 
 pub type AnimationGroupID = DefaultKey;
 
@@ -357,6 +357,15 @@ impl<T: Clone> AnimationGroup<T> {
             };
             runtime_infos.insert(anime.animation.ty(), temp);
         }
+    }
+
+    pub fn clear(&mut self) -> Vec<AnimationInfo> {
+        let mut result = vec![];
+        self.animations.drain(..).for_each(|item| {
+            result.push(item.animation);
+        });
+
+        result
     }
 }
 

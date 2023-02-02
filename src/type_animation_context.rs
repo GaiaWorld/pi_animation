@@ -34,6 +34,12 @@ pub trait TTypeFrameCurve<F: FrameDataValue> {
     fn curve(&self) -> &FrameCurve<F>;
 }
 
+impl<F: FrameDataValue> TTypeFrameCurve<F> for FrameCurve<F> {
+    fn curve(&self) -> &FrameCurve<F> {
+        &self
+    }
+}
+
 /// 类型动画上下文 - 每种数据类型的动画实现一个
 pub struct TypeAnimationContext<K: Clone + Hash + PartialEq + Eq, F: FrameDataValue, D: TTypeFrameCurve<F>> {
     ty: KeyFrameDataType,
@@ -65,44 +71,35 @@ impl<K: Clone + Hash + PartialEq + Eq, F: FrameDataValue, D: TTypeFrameCurve<F>>
     pub fn create_animation(
         &mut self,
         attr: IDAnimatableAttr,
-        key_curve: K,
         curve: D,
     ) -> AnimationInfo {
-        if let Some(index) = self.curve_usage.get(&key_curve) {
-            AnimationInfo {
+        let curve_info = FrameCurvePool::curve_info(curve.curve());
+        
+        if let Some(index) = self.id_pool.pop() {
+            let result = AnimationInfo {
                 attr,
                 ty: self.ty,
-                curve_info: FrameCurvePool::curve_info(curve.curve()),
-                curve_id: *index,
-            }
+                curve_info,
+                curve_id: index,
+            };
+
+            self.curves[index] = Some(curve);
+            
+            result
         } else {
-            if let Some(index) = self.id_pool.pop() {
-                let result = AnimationInfo {
-                    attr,
-                    ty: self.ty,
-                    curve_info: FrameCurvePool::curve_info(curve.curve()),
-                    curve_id: index,
-                };
+            let index = self.curves.len();
+            let result = AnimationInfo {
+                attr,
+                ty: self.ty,
+                curve_info,
+                curve_id: index,
+            };
 
-                self.curve_usage.insert(key_curve, index);
-                self.curves[index] = Some(curve);
-                
-                result
-            } else {
-                let index = self.curves.len();
-                let result = AnimationInfo {
-                    attr,
-                    ty: self.ty,
-                    curve_info: FrameCurvePool::curve_info(curve.curve()),
-                    curve_id: index,
-                };
+            self.curves.push(Some(curve));
 
-                self.curve_usage.insert(key_curve, index);
-                self.curves.push(Some(curve));
-
-                result
-            }
+            result
         }
+
     }
     /// 使用曲线计算结果 计算属性值
     pub fn anime<T: Clone, R: TypeAnimationResultPool<F, T>>(
@@ -161,6 +158,21 @@ impl<K: Clone + Hash + PartialEq + Eq, F: FrameDataValue, D: TTypeFrameCurve<F>>
     pub fn ty(&self) -> KeyFrameDataType {
         self.ty
     }
+
+    /// 移除动画对应的曲线信息
+    /// * animations 为 AnimationContextAmount.del_animation_group 的返回值
+    pub fn remove(
+        &mut self,
+        animations: & Vec<AnimationInfo>,
+    ) {
+        animations.iter().for_each(|anime| {
+            if anime.ty == self.ty {
+                self.curves[anime.curve_id] = None;
+                self.id_pool.push(anime.curve_id);
+            }
+        });
+    }
+
 }
 
 /// 动画进度计算上下文
@@ -223,7 +235,7 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
         id
     }
     /// 删除动画组
-    pub fn del_animation_group(&mut self, id: AnimationGroupID) {
+    pub fn del_animation_group(&mut self, id: AnimationGroupID) -> Vec<AnimationInfo> {
         match self.group_infos.get_mut(id) {
             Some(group_info) => {
                 group_info.is_playing = false;
@@ -233,9 +245,11 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
                 group_info.start_event = false;
                 group_info.end_event = false;
                 group_info.loop_event = false;
-                self.group_mgr.del(id);
+                self.group_mgr.del(id)
             }
-            None => {}
+            None => {
+                vec![]
+            }
         }
     }
     /// 为动画组添加 Target动画

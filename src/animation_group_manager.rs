@@ -1,12 +1,12 @@
 use pi_slotmap::{SlotMap, DefaultKey};
 
-use crate::{target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetId}, animation_group::{AnimationGroupID, AnimationGroup}};
+use crate::{target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetId}, animation_group::{AnimationGroupID, AnimationGroup}, animation::AnimationInfo};
 
 
 pub trait AnimationGroupManager<T: Clone> {
 	fn create(&mut self) -> AnimationGroupID;
     // fn create<R: IDAnimatableTargetAllocator>(&mut self, target_allocator: &mut R) -> AnimationGroupID;
-    fn del(&mut self, id: AnimationGroupID);
+    fn del(&mut self, id: AnimationGroupID) -> Vec<AnimationInfo>;
     fn get_mut(&mut self, id: AnimationGroupID) -> Option<&mut AnimationGroup<T>>;
     fn get(&self, id: AnimationGroupID) -> Option<&AnimationGroup<T>>;
 }
@@ -55,8 +55,13 @@ impl<T: Clone> AnimationGroupManager<T> for AnimationGroupManagerDefault<T> {
         &mut self,
         // target_allocator: &mut R,
         id: AnimationGroupID,
-    ) {
-		self.groups.remove(id);
+    ) -> Vec<AnimationInfo> {
+		if let Some(mut group) = self.groups.remove(id) {
+            group.clear()
+        } else {
+            vec![]
+        }
+        
         // match self.groups.get_mut(id) {
         //     Some(group) => {
         //         group.stop();
