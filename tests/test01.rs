@@ -113,6 +113,8 @@ impl TypeAnimationContextMgr {
         let mut animation_context_amount = AnimationContextAmount::default(AnimationGroupManagerDefault::default());
         let mut ty_allocator = KeyFrameDataTypeAllocator::default();
 
+        animation_context_amount.debug(true);
+
         let value0_ctx = TypeAnimationContext::new(ty_allocator.alloc().unwrap(), &mut runtime_infos);
         let value0_result_pool = TypeAnimationResultPoolDefault::default();
         let value1_ctx = TypeAnimationContext::new(ty_allocator.alloc().unwrap(), &mut runtime_infos);
@@ -418,14 +420,14 @@ mod test01 {
                 };
                 type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation, group0, targets.get(j).unwrap().anime_target_id());
             }
-            type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 60, AnimationAmountCalc::default());
+            type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Opposite(None), 0.0, frame_count as KeyFrameCurveValue, 60, AnimationAmountCalc::default());
         }
         type_animation_ctx_mgr.animation_context_amount.debug(true);
         // 测试 动画性能 计 10w 个动画计算 & 10_000 个对象的数据修改
         b.iter(move || {
 
             type_animation_ctx_mgr.anime(1);
-            type_animation_ctx_mgr.anime_uncheck(1);
+            // type_animation_ctx_mgr.anime_uncheck(1);
 
             let mut ii = 0;
             for i in 0..group_animation_range {
@@ -434,7 +436,7 @@ mod test01 {
 
                 results.iter().for_each(|value| {
                     target.anime_modify(value.attr, value.value);
-                    // ii += 1;
+                    ii += 1;
                 });
             }
         });
