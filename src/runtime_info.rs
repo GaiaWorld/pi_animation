@@ -52,7 +52,9 @@ impl<T: Clone> RuntimeInfoMap<T> {
                 list.push(info);
                 Ok(())
             }
-            None => Err(EAnimationError::RuntimeInfoMapNotFindType),
+            None => {
+                Err(EAnimationError::RuntimeInfoMapNotFindType)
+            },
         }
     }
     pub fn reset(&mut self) {

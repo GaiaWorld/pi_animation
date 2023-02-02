@@ -29,7 +29,7 @@ pub trait TFrameCurveInfoManager {
 }
 
 pub trait TFrameCurvePool<T: FrameDataValue> {
-    fn insert(&mut self, id: FrameCurveInfoID, curve: FrameCurve<T>);
+    fn insert(&mut self, id: FrameCurveInfoID, curve: Arc<FrameCurve<T>>);
     fn remove(&mut self, id: FrameCurveInfoID) -> Result<(), EAnimationError>;
     fn get(&self, id: FrameCurveInfoID) -> Result<Arc<FrameCurve<T>>, EAnimationError>;
 }
@@ -149,7 +149,15 @@ pub struct FrameCurveInfo {
     min_frame: FrameIndex,
     design_frame_per_second: FramePerSecond,
 }
-
+impl<T: FrameDataValue> From<Arc<FrameCurve<T>>> for FrameCurveInfo {
+    fn from(value: Arc<FrameCurve<T>>) -> Self {
+        Self {
+            max_frame: value.max_frame,
+            min_frame: value.min_frame,
+            design_frame_per_second: value.design_frame_per_second,
+        }
+    }
+}
 impl FrameCurveInfo {
     pub fn new(
         max_frame: FrameIndex,
@@ -206,8 +214,8 @@ impl<T: FrameDataValue> FrameCurvePool<T> {
 }
 
 impl<T: FrameDataValue> TFrameCurvePool<T> for FrameCurvePool<T> {
-    fn insert(&mut self, id: FrameCurveInfoID, curve: FrameCurve<T>) {
-        let arc = Arc::new(curve);
+    fn insert(&mut self, id: FrameCurveInfoID, curve: Arc<FrameCurve<T>>) {
+        let arc = curve;
 
         self.infos.push(id);
         self.arcs.push(arc);

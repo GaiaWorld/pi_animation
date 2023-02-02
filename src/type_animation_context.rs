@@ -1,10 +1,11 @@
-use std::{fmt::Debug, marker::PhantomData, sync::Arc};
+use std::{fmt::Debug, marker::PhantomData, sync::Arc, hash::Hash};
 
 use pi_curves::curve::{
     frame::{FrameDataValue, KeyFrameCurveValue, KeyFrameDataType, KeyFrameDataTypeAllocator},
     frame_curve::FrameCurve,
     FramePerSecond,
 };
+use pi_hash::XHashMap;
 use pi_slotmap::{DefaultKey, SecondaryMap};
 
 use crate::{
@@ -29,35 +30,79 @@ use crate::{
     },
 };
 
-/// 类型动画上下文 - 每种数据类型的动画实现一个
-pub struct TypeAnimationContext<T: FrameDataValue> {
-    ty: KeyFrameDataType,
-    curves: FrameCurvePool<T>,
+pub trait TTypeFrameCurve<F: FrameDataValue> {
+    fn curve(&self) -> &FrameCurve<F>;
 }
 
-impl<F: FrameDataValue> TypeAnimationContext<F> {
+/// 类型动画上下文 - 每种数据类型的动画实现一个
+pub struct TypeAnimationContext<K: Clone + Hash + PartialEq + Eq, F: FrameDataValue, D: TTypeFrameCurve<F>> {
+    ty: KeyFrameDataType,
+    /// 记录使用的曲线名称, 在数组中的序号即anime的ID
+    curve_usage: XHashMap<K, usize>,
+    curves: Vec<Option<D>>,
+    id_pool: Vec<usize>,
+    pd: PhantomData<F>,
+}
+
+impl<K: Clone + Hash + PartialEq + Eq, F: FrameDataValue, D: TTypeFrameCurve<F>> TypeAnimationContext<K, F, D> {
     pub fn new<T: Clone>(
         ty: usize,
         runtime_info_map: &mut RuntimeInfoMap<T>,
-        curve_infos: &mut FrameCurveInfoManager,
     ) -> Self {
         runtime_info_map.add_type(ty);
-        curve_infos.add_type(ty);
         Self {
             ty,
-            curves: FrameCurvePool::default(),
+            curves: vec![],
+            curve_usage: XHashMap::default(),
+            id_pool: vec![],
+            pd: PhantomData::default()
         }
     }
+    pub fn curves(&self) -> &Vec<Option<D>> {
+        &self.curves
+    }
     /// 添加 动画曲线数据
-    pub fn add_frame_curve(
+    pub fn create_animation(
         &mut self,
-        curve_infos: &mut FrameCurveInfoManager,
-        curve: Arc<FrameCurve<F>>,
-    ) -> FrameCurveInfoID {
-        let id = curve_infos.insert(self.ty, FrameCurvePool::curve_info(&curve));
-        self.curves.insert(id, curve);
+        attr: IDAnimatableAttr,
+        key_curve: K,
+        curve: D,
+    ) -> AnimationInfo {
+        if let Some(index) = self.curve_usage.get(&key_curve) {
+            AnimationInfo {
+                attr,
+                ty: self.ty,
+                curve_info: FrameCurvePool::curve_info(curve.curve()),
+                curve_id: *index,
+            }
+        } else {
+            if let Some(index) = self.id_pool.pop() {
+                let result = AnimationInfo {
+                    attr,
+                    ty: self.ty,
+                    curve_info: FrameCurvePool::curve_info(curve.curve()),
+                    curve_id: index,
+                };
 
-        id
+                self.curve_usage.insert(key_curve, index);
+                self.curves[index] = Some(curve);
+                
+                result
+            } else {
+                let index = self.curves.len();
+                let result = AnimationInfo {
+                    attr,
+                    ty: self.ty,
+                    curve_info: FrameCurvePool::curve_info(curve.curve()),
+                    curve_id: index,
+                };
+
+                self.curve_usage.insert(key_curve, index);
+                self.curves.push(Some(curve));
+
+                result
+            }
+        }
     }
     /// 使用曲线计算结果 计算属性值
     pub fn anime<T: Clone, R: TypeAnimationResultPool<F, T>>(
@@ -70,22 +115,18 @@ impl<F: FrameDataValue> TypeAnimationContext<F> {
         // log::trace!("anime, runtime_infos len: {}", runtime_infos.len());
         // println!("anime, runtime_infos len: {}", runtime_infos.len());
         for info in runtime_infos {
-            let curve = self.curves.get(info.curve_id);
-            match curve {
-                Ok(curve) => {
-                    // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
-                    let value = curve.interple(info.amount_in_second);
-                    let result = AnimeResult {
-                        value,
-                        attr: info.attr,
-                        weight: info.group_weight,
-                    };
-                    match result_pool.record_result(info.target.clone(), info.attr, result) {
-                        Ok(_) => {}
-                        Err(e) => errs.push(e),
-                    }
+            if let Some(Some(curve)) = self.curves.get(info.curve_id) {
+                // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
+                let value = curve.curve().interple(info.amount_in_second);
+                let result = AnimeResult {
+                    value,
+                    attr: info.attr,
+                    weight: info.group_weight,
+                };
+                match result_pool.record_result(info.target.clone(), info.attr, result) {
+                    Ok(_) => {}
+                    Err(e) => errs.push(e),
                 }
-                Err(e) => errs.push(e),
             }
         }
 
@@ -105,9 +146,9 @@ impl<F: FrameDataValue> TypeAnimationContext<F> {
     ) {
         let runtime_infos = runtime_infos.list.get(self.ty).unwrap();
         for info in runtime_infos {
-            let curve = self.curves.get(info.curve_id).unwrap();
+            let curve = self.curves.get(info.curve_id).unwrap().as_ref().unwrap();
             // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
-            let value = curve.interple(info.amount_in_second);
+            let value = curve.curve().interple(info.amount_in_second);
             let result = AnimeResult {
                 value,
                 attr: info.attr,
@@ -116,6 +157,7 @@ impl<F: FrameDataValue> TypeAnimationContext<F> {
             result_pool.record_result(info.target.clone(), info.attr, result);
         }
     }
+
     pub fn ty(&self) -> KeyFrameDataType {
         self.ty
     }
@@ -155,19 +197,6 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
         for (i, _) in self.group_infos.iter_mut() {
             let group = self.group_mgr.get_mut(i).unwrap();
             group.debug = flag;
-        }
-    }
-    /// 添加 属性动画数据
-    pub fn create_animation(
-        &mut self,
-        curve_infos: &mut FrameCurveInfoManager,
-        curve_id: FrameCurveInfoID,
-        attr: IDAnimatableAttr,
-        ty: KeyFrameDataType,
-    ) -> Result<AnimationInfo, EAnimationError> {
-        match curve_infos.get(ty, curve_id) {
-            Ok(curve_info) => Ok(AnimationInfo { attr, ty, curve_info, curve_id }),
-            Err(e) => Err(e),
         }
     }
     /// 创建动画组

@@ -1,7 +1,15 @@
 use pi_curves::curve::frame::FrameDataValue;
 use pi_slotmap::{DefaultKey, SlotMap, SecondaryMap};
 
-use crate::{target_modifier::{IDAnimatableTarget, IDAnimatableAttr}, animation_context::AnimeResult, error::EAnimationError};
+use crate::{target_modifier::{IDAnimatableTarget, IDAnimatableAttr}, error::EAnimationError};
+
+
+#[derive(Debug, Clone, Copy)]
+pub struct AnimeResult<T: FrameDataValue> {
+    pub value: T,
+    pub attr: IDAnimatableAttr,
+    pub weight: f32,
+}
 
 /// 对应动画数据类型的动画结果池
 pub trait TypeAnimationResultPool<F: FrameDataValue, T> {

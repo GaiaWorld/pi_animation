@@ -1,10 +1,10 @@
 #![feature(test)]
 extern crate test;
 
-use std::ops::Add;
+use std::{ops::Add, sync::Arc};
 
-use pi_animation::{target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId, IDAnimatableTargetAllocator, IDAnimatableTargetAllocatorDefault}, error::EAnimationError, animation_context::{TypeAnimationContext, AnimationContextAmount}, runtime_info::RuntimeInfoMap, frame_curve_manager::FrameCurveInfoManager, animation_result_pool::{TypeAnimationResultPoolDefault, TypeAnimationResultPool}, animation_group_manager::AnimationGroupManagerDefault, animation::AnimationManagerDefault};
-use pi_curves::curve::frame::{FrameValueScale, FrameDataValue, KeyFrameDataType, KeyFrameCurveValue, KeyFrameDataTypeAllocator};
+use pi_animation::{target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId, IDAnimatableTargetAllocator, IDAnimatableTargetAllocatorDefault}, error::EAnimationError, type_animation_context::{TypeAnimationContext, AnimationContextAmount, TTypeFrameCurve}, runtime_info::RuntimeInfoMap, frame_curve_manager::FrameCurveInfoManager, animation_result_pool::{TypeAnimationResultPoolDefault, TypeAnimationResultPool}, animation_group_manager::AnimationGroupManagerDefault};
+use pi_curves::curve::{frame::{FrameValueScale, FrameDataValue, KeyFrameDataType, KeyFrameCurveValue, KeyFrameDataTypeAllocator}, frame_curve::FrameCurve};
 use pi_slotmap::{DefaultKey, SlotMap};
 
 ////////////////////////////////////////////////////////////////
@@ -91,18 +91,18 @@ impl TAnimatableTargetModifier<f32> for Target0 {
 
 ////////////////////////////////////////////////////////////////
 pub struct TypeAnimationContextMgr {
-    pub value0_ctx: TypeAnimationContext<Value0>,
+    pub value0_ctx: TypeAnimationContext<usize, Value0, AssetCurve<Value0>>,
     pub value0_result_pool: TypeAnimationResultPoolDefault<Value0>,
-    pub value1_ctx: TypeAnimationContext<Value1>,
+    pub value1_ctx: TypeAnimationContext<usize, Value1, AssetCurve<Value1>>,
     pub value1_result_pool: TypeAnimationResultPoolDefault<Value1>,
-    pub f32_ctx: TypeAnimationContext<f32>,
+    pub f32_ctx: TypeAnimationContext<usize, f32, AssetCurve<f32>>,
     pub f32_result_pool: TypeAnimationResultPoolDefault<f32>,
     pub runtime_infos: RuntimeInfoMap<DefaultKey>,
     pub curve_infos: FrameCurveInfoManager,
     // pub target_allocator: IDAnimatableTargetAllocatorDefault,
 	pub target_allocator: SlotMap<DefaultKey, ()>,
     pub ty_allocator: KeyFrameDataTypeAllocator,
-    pub animation_context_amount: AnimationContextAmount<AnimationManagerDefault, DefaultKey, AnimationGroupManagerDefault<DefaultKey>>,
+    pub animation_context_amount: AnimationContextAmount<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>,
 }
 
 impl TypeAnimationContextMgr {
@@ -110,14 +110,14 @@ impl TypeAnimationContextMgr {
         let mut runtime_infos = RuntimeInfoMap::default();
         let mut curve_infos = FrameCurveInfoManager::default();
         let mut target_allocator = SlotMap::default();
-        let mut animation_context_amount = AnimationContextAmount::default(AnimationManagerDefault::default(), AnimationGroupManagerDefault::default());
+        let mut animation_context_amount = AnimationContextAmount::default(AnimationGroupManagerDefault::default());
         let mut ty_allocator = KeyFrameDataTypeAllocator::default();
 
-        let value0_ctx = TypeAnimationContext::new(ty_allocator.alloc().unwrap(), &mut runtime_infos, &mut curve_infos);
+        let value0_ctx = TypeAnimationContext::new(ty_allocator.alloc().unwrap(), &mut runtime_infos);
         let value0_result_pool = TypeAnimationResultPoolDefault::default();
-        let value1_ctx = TypeAnimationContext::new(ty_allocator.alloc().unwrap(), &mut runtime_infos, &mut curve_infos);
+        let value1_ctx = TypeAnimationContext::new(ty_allocator.alloc().unwrap(), &mut runtime_infos);
         let value1_result_pool = TypeAnimationResultPoolDefault::default();
-        let f32_ctx = TypeAnimationContext::new(ty_allocator.alloc().unwrap(), &mut runtime_infos, &mut curve_infos);
+        let f32_ctx = TypeAnimationContext::new(ty_allocator.alloc().unwrap(), &mut runtime_infos);
         let f32_result_pool = TypeAnimationResultPoolDefault::default();
         Self {
             value0_ctx, value0_result_pool,
@@ -180,14 +180,24 @@ impl TypeAnimationContextMgr {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct AssetCurve<F: FrameDataValue>(pub Arc<FrameCurve<F>>);
+impl<F: FrameDataValue> TTypeFrameCurve<F> for AssetCurve<F> {
+    fn curve(&self) -> &FrameCurve<F> {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod test01 {
-    use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc};
+    use std::sync::Arc;
+
+    use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc, frame_curve_manager::FrameCurvePool};
     use pi_curves::{curve::{frame_curve::FrameCurve, FrameIndex, frame::KeyFrameCurveValue}, easing::EEasingMode, steps::EStepMode};
     use pi_slotmap::SlotMap;
     use test::{Bencher};
 
-    use crate::{TypeAnimationContextMgr, Value0, Target0, Target0AnimatableAttrSet};
+    use crate::{TypeAnimationContextMgr, Value0, Target0, Target0AnimatableAttrSet, AssetCurve};
 
     #[test]
     fn test_animatable_float1() {
@@ -199,11 +209,10 @@ mod test01 {
 
         // 创建动画曲线
         let frame_count = 60 as FrameIndex;
+        let key_curve1 = 0;
         let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
-        let curve1_id = type_animation_ctx_mgr.f32_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, curve1);
-
-        // 创建属性动画
-        let animation0 = type_animation_ctx_mgr.animation_context_amount.add_animation(&mut type_animation_ctx_mgr.curve_infos, curve1_id, Target0AnimatableAttrSet::V2 as IDAnimatableAttr, type_animation_ctx_mgr.f32_ctx.ty()).unwrap();
+        let curve1 = crate::AssetCurve::<f32>(Arc::new(curve1));
+        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, key_curve1, curve1);
 
         // 创建动画组
         let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
@@ -243,11 +252,11 @@ mod test01 {
 
         // 创建动画曲线
         let frame_count = 60 as FrameIndex;
+        let key_curve1 = 0;
         let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
-        let curve1_id = type_animation_ctx_mgr.f32_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, curve1);
-
+        let curve1 = crate::AssetCurve::<f32>(Arc::new(curve1));
         // 创建属性动画
-        let animation0 = type_animation_ctx_mgr.animation_context_amount.add_animation(&mut type_animation_ctx_mgr.curve_infos, curve1_id, Target0AnimatableAttrSet::V2 as IDAnimatableAttr, type_animation_ctx_mgr.f32_ctx.ty()).unwrap();
+        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, key_curve1, curve1);
 
         // 创建动画组
         let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
@@ -312,11 +321,11 @@ mod test01 {
 
         // 创建动画曲线
         let frame_count = 60 as FrameIndex;
+        let key_curve1 = 0;
         let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
-        let curve1_id = type_animation_ctx_mgr.f32_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, curve1);
-
+        let curve1 = crate::AssetCurve::<f32>(Arc::new(curve1));
         // 创建属性动画
-        let animation0 = type_animation_ctx_mgr.animation_context_amount.add_animation(&mut type_animation_ctx_mgr.curve_infos, curve1_id, Target0AnimatableAttrSet::V2 as IDAnimatableAttr, type_animation_ctx_mgr.f32_ctx.ty()).unwrap();
+        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, key_curve1, curve1);
 
         // 创建动画组
         let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
@@ -370,35 +379,24 @@ mod test01 {
     fn test_peformance(b: &mut Bencher) {
         let curve_range = 100_000;
         let animation_range = 100_000;
-        let group_range = 10;
-        let group_animation_range = 10000;
+        let group_range = 100;
+        let group_animation_range = 1000;
         let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
 
         let frame_count = 60 as FrameIndex;
         // MinMaxCurve
+        let key_curve0 = 0;
         let mut curve0 = FrameCurve::curve_minmax_curve(Value0(0.0f32), Value0(1.0f32), 60);
         FrameCurve::curve_minmax_curve_frame(&mut curve0, 0, 0.0f32, 2.0f32, 2.0f32);
         FrameCurve::curve_minmax_curve_frame(&mut curve0, (frame_count/2) as FrameIndex, 0.5f32, 0.0f32, 0.0f32);
         FrameCurve::curve_minmax_curve_frame(&mut curve0, frame_count as FrameIndex, 1.0f32, 2.0f32, 2.0f32);
+        let curve0 = crate::AssetCurve::<Value0>(Arc::new(curve0));
 
-        let curve0_id = type_animation_ctx_mgr.value0_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, curve0);
 
+        let key_curve1 = 1;
         let mut curve1 = FrameCurve::curve_easing(Value0(0.0), Value0(1.0), frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
-        let curve1_id = type_animation_ctx_mgr.value0_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, curve1);
+        let curve1 = crate::AssetCurve::<Value0>(Arc::new(curve1));
 
-        // 添加 100_000 曲线
-        for _ in 0..curve_range {
-            let mut c = FrameCurve::curve_easing(Value0(0.0), Value0(1.0), frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
-            let v = type_animation_ctx_mgr.value0_ctx.add_frame_curve(&mut type_animation_ctx_mgr.curve_infos, c);
-        }
-
-        let animation0 = type_animation_ctx_mgr.animation_context_amount.add_animation(&mut type_animation_ctx_mgr.curve_infos, curve0_id, Target0AnimatableAttrSet::V0 as IDAnimatableAttr, type_animation_ctx_mgr.value0_ctx.ty()).unwrap();
-        let animation1 = type_animation_ctx_mgr.animation_context_amount.add_animation(&mut type_animation_ctx_mgr.curve_infos, curve1_id, Target0AnimatableAttrSet::V0a as IDAnimatableAttr, type_animation_ctx_mgr.value0_ctx.ty()).unwrap();
-
-        // 添加 100_000 动画
-        for i in 0..animation_range {
-            let a = type_animation_ctx_mgr.animation_context_amount.add_animation(&mut type_animation_ctx_mgr.curve_infos, curve0_id, Target0AnimatableAttrSet::V0a as IDAnimatableAttr, type_animation_ctx_mgr.value0_ctx.ty()).unwrap();
-        }
 
         let mut targets = vec![];
         // 添加 10_000 目标对象
@@ -411,7 +409,14 @@ mod test01 {
         for i in 0..group_range {
             let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
             for j in 0..group_animation_range {
-                type_animation_ctx_mgr.animation_context_amount.add_target_animation(i, group0, targets.get(j).unwrap().anime_target_id());
+                let animation = if j % 2 == 0 {
+                    // 创建属性动画
+                    type_animation_ctx_mgr.value0_ctx.create_animation(Target0AnimatableAttrSet::V0 as IDAnimatableAttr, key_curve0, curve0.clone())
+                } else {
+                    // 创建属性动画
+                    type_animation_ctx_mgr.value0_ctx.create_animation(Target0AnimatableAttrSet::V0a as IDAnimatableAttr, key_curve1, curve1.clone())
+                };
+                type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation, group0, targets.get(j).unwrap().anime_target_id());
             }
             type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 60, AnimationAmountCalc::default());
         }
@@ -420,15 +425,16 @@ mod test01 {
         b.iter(move || {
 
             type_animation_ctx_mgr.anime(1);
-            // type_animation_ctx_mgr.anime_uncheck(1);
+            type_animation_ctx_mgr.anime_uncheck(1);
 
+            let mut ii = 0;
             for i in 0..group_animation_range {
                 let target = targets.get_mut(i).unwrap();
                 let results = type_animation_ctx_mgr.value0_result_pool.query_result(target.anime_target_id());
-                // println!("results {}", results.len());
 
                 results.iter().for_each(|value| {
                     target.anime_modify(value.attr, value.value);
+                    // ii += 1;
                 });
             }
         });
