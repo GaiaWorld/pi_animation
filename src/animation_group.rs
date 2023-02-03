@@ -366,6 +366,10 @@ impl<T: Clone> AnimationGroup<T> {
 
         result
     }
+    
+    pub fn animations(& self) -> &Vec<TargetAnimation<T>> {
+        &self.animations
+    }
 }
 
 /// AnimationGroup 的可动画属性的枚举

@@ -3,13 +3,13 @@ use pi_curves::curve::{FrameIndex, FramePerSecond, frame::KeyFrameCurveValue};
 pub type FrameEventData = u16;
 
 pub struct CurveFrameEvent<D: Clone> {
-    total_frame: FramePerSecond,
+    total_frame: KeyFrameCurveValue,
     events: Vec<FrameIndex>,
     datas: Vec<D>,
 }
 
 impl<D: Clone> CurveFrameEvent<D> {
-    pub fn new(total_frame: FramePerSecond) -> Self {
+    pub fn new(total_frame: KeyFrameCurveValue) -> Self {
         Self {
             total_frame,
             events: vec![],

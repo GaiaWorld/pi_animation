@@ -272,30 +272,30 @@ mod test01 {
 
         // 查询动画事件
         // 创建帧事件
-        let mut curve_frame_event = CurveFrameEvent::<TestFrameEventData>::new(60);
-        curve_frame_event.add(10, TestFrameEventData::Test0);
-        curve_frame_event.add(50, TestFrameEventData::Test1);
+        let mut curve_frame_event = CurveFrameEvent::<TestFrameEventData>::new(60.0);
+        // curve_frame_event.add(10, TestFrameEventData::Test0);
+        // curve_frame_event.add(50, TestFrameEventData::Test1);
         // 创建动画监听器 - 监听动画组 group0
         let mut listener = AnimationListener::<TestFrameEventData> { 
             group: group0,
-            on_start: Some(Box::new(|| {
+            on_start: vec![Box::new(|| {
                 println!("Group Event Start.");
                 Ok(EAnimationEventResult::RemoveListen)
-            })),
-            on_end: Some(Box::new(|| {
+            })],
+            on_end: vec![Box::new(|| {
                 println!("Group Event End.");
                 Ok(EAnimationEventResult::RemoveListen)
-            })),
-            on_loop: Some(Box::new(|looped_count| {
+            })],
+            on_loop: vec![Box::new(|looped_count| {
                 println!("Group Event Loop {}.", looped_count);
                 Ok(EAnimationEventResult::None)
-            })),
-            on_frame_event: Some(Box::new(|events| {
+            })],
+            on_frame_event: vec![Box::new(|events| {
                 events.iter().for_each(|v| {
                     println!("Group Event Frame Event {:?}.", v);
                 });
                 Ok(EAnimationEventResult::None)
-            })),
+            })],
         };
         
         for i in 0..30 {
@@ -340,30 +340,30 @@ mod test01 {
 
         // 查询动画事件
         // 创建帧事件
-        let mut curve_frame_event = CurveFrameEvent::<TestFrameEventData>::new(60);
+        let mut curve_frame_event = CurveFrameEvent::<TestFrameEventData>::new(60.);
         curve_frame_event.add(10, TestFrameEventData::Test0);
         curve_frame_event.add(50, TestFrameEventData::Test1);
         // 创建动画监听器 - 监听动画组 group0
         let mut listener = AnimationListener::<TestFrameEventData> { 
             group: group0,
-            on_start: Some(Box::new(|| {
+            on_start: vec![Box::new(|| {
                 println!("Group Event Start.");
                 Ok(EAnimationEventResult::RemoveListen)
-            })),
-            on_end: Some(Box::new(|| {
+            })],
+            on_end: vec![Box::new(|| {
                 println!("Group Event End.");
                 Ok(EAnimationEventResult::RemoveListen)
-            })),
-            on_loop: Some(Box::new(|looped_count| {
+            })],
+            on_loop: vec![Box::new(|looped_count| {
                 println!("Group Event Loop {}.", looped_count);
                 Ok(EAnimationEventResult::None)
-            })),
-            on_frame_event: Some(Box::new(|events| {
+            })],
+            on_frame_event: vec![Box::new(|events| {
                 events.iter().for_each(|v| {
                     println!("Group Event Frame Event {:?}.", v);
                 });
                 Ok(EAnimationEventResult::None)
-            })),
+            })],
         };
 
         for i in 0..30 {

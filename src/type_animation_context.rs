@@ -11,7 +11,7 @@ use pi_slotmap::{DefaultKey, SecondaryMap};
 use crate::{
     amount::AnimationAmountCalc,
     animation::{AnimationInfo},
-    animation_group::{AnimationGroupID, AnimationGroupRuntimeInfo},
+    animation_group::{AnimationGroupID, AnimationGroupRuntimeInfo, AnimationGroup},
     animation_group_manager::AnimationGroupManager,
     animation_listener::{AnimationListener, EAnimationEvent},
     animation_result_pool::{TypeAnimationResultPool, AnimeResult},
@@ -230,6 +230,12 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
         // };
 
         id
+    }
+    pub fn animation_group(
+        &self,
+        id: AnimationGroupID,
+    ) -> Option<&AnimationGroup<T>> {
+        self.group_mgr.get(id)
     }
     /// 删除动画组
     pub fn del_animation_group(&mut self, id: AnimationGroupID) -> Vec<AnimationInfo> {

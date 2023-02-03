@@ -1,3 +1,5 @@
+use std::mem::replace;
+
 use crate::{animation_group::AnimationGroupID, error::EAnimationError};
 
 #[derive(Debug, Clone, Copy)]
@@ -22,71 +24,100 @@ pub enum EAnimationEvent {
 
 pub struct AnimationListener<D: Clone> {
     pub group: AnimationGroupID,
-    pub on_start: Option<OnStart>,
-    pub on_end: Option<OnEnd>,
-    pub on_loop: Option<OnLoop>,
-    pub on_frame_event: Option<OnFrameEvent<D>>,
+    pub on_start: Vec<OnStart>,
+    pub on_end: Vec<OnEnd>,
+    pub on_loop: Vec<OnLoop>,
+    pub on_frame_event: Vec<OnFrameEvent<D>>,
 }
 
 impl<D: Clone> AnimationListener<D> {
+    pub fn new(group: AnimationGroupID) -> Self {
+        Self {
+            group,
+            on_start: vec![],
+            on_end: vec![],
+            on_loop: vec![],
+            on_frame_event: vec![],
+        }
+    }
     pub fn on_start(
         &mut self,
     ) {
-        match &self.on_start {
-            Some(call) => match call() {
+        let mut temp = replace(&mut self.on_start, vec![]);
+        temp.drain(..).for_each(|call| {
+            match call() {
                 Ok(result) => match result {
-                    EAnimationEventResult::None => {},
-                    EAnimationEventResult::RemoveListen => { self.on_start = None; },
+                    EAnimationEventResult::None => {
+                        self.on_start.push(call)
+                    },
+                    EAnimationEventResult::RemoveListen => {
+                    },
                 },
                 Err(_) => {},
-            },
-            None => {},
-        }
+            }
+        });
+        // match &self.on_start {
+        //     Some(call) => match call() {
+        //         Ok(result) => match result {
+        //             EAnimationEventResult::None => {},
+        //             EAnimationEventResult::RemoveListen => { self.on_start = None; },
+        //         },
+        //         Err(_) => {},
+        //     },
+        //     None => {},
+        // }
     }
     pub fn on_end(
         &mut self,
     ) {
-        match &self.on_end {
-            Some(call) => match call() {
+        let mut temp = replace(&mut self.on_end, vec![]);
+        temp.drain(..).for_each(|call| {
+            match call() {
                 Ok(result) => match result {
-                    EAnimationEventResult::None => {},
-                    EAnimationEventResult::RemoveListen => { self.on_end = None; },
+                    EAnimationEventResult::None => {
+                        self.on_end.push(call)
+                    },
+                    EAnimationEventResult::RemoveListen => {
+                    },
                 },
                 Err(_) => {},
-            },
-            None => {},
-        }
+            }
+        });
     }
     pub fn on_loop(
         &mut self,
         loop_count: u32,
     ) {
-        match &self.on_loop {
-            Some(call) => match call(loop_count) {
+        let mut temp = replace(&mut self.on_loop, vec![]);
+        temp.drain(..).for_each(|call| {
+            match call(loop_count) {
                 Ok(result) => match result {
-                    EAnimationEventResult::None => {},
-                    EAnimationEventResult::RemoveListen => { self.on_loop = None; },
+                    EAnimationEventResult::None => {
+                        self.on_loop.push(call)
+                    },
+                    EAnimationEventResult::RemoveListen => {
+                    },
                 },
                 Err(_) => {},
-            },
-            None => {},
-        }
+            }
+        });
     }
     pub fn on_frame(
         &mut self,
         frame_datas: Vec<D>,
     ) {
-        match &self.on_frame_event {
-            Some(call) => {
-                match call(frame_datas) {
-                    Ok(result) => match result {
-                        EAnimationEventResult::None => {},
-                        EAnimationEventResult::RemoveListen => { self.on_frame_event = None; },
+        let mut temp = replace(&mut self.on_frame_event, vec![]);
+        temp.drain(..).for_each(|call| {
+            match call(frame_datas.clone()) {
+                Ok(result) => match result {
+                    EAnimationEventResult::None => {
+                        self.on_frame_event.push(call)
                     },
-                    Err(_) => {},
-                }
-            },
-            None => {},
-        }
+                    EAnimationEventResult::RemoveListen => {
+                    },
+                },
+                Err(_) => {},
+            }
+        });
     }
 }
