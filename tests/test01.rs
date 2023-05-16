@@ -194,7 +194,7 @@ impl<F: FrameDataValue> AsRef<FrameCurve<F>> for AssetCurve<F> {
 
 #[cfg(test)]
 mod test01 {
-    use std::sync::Arc;
+    use std::{sync::Arc, mem::replace};
 
     use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc};
     use pi_curves::{curve::{frame_curve::FrameCurve, FrameIndex, frame::KeyFrameCurveValue}, easing::EEasingMode, steps::EStepMode};
@@ -298,15 +298,21 @@ mod test01 {
             })],
         };
         
-        for i in 0..30 {
+        for i in 0..100 {
             // 动画运行
-            type_animation_ctx_mgr.anime(50);
-            type_animation_ctx_mgr.animation_context_amount.animation_event(&mut listener, Some(&curve_frame_event));
-            // 查询动画结果
-            let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
-            results.iter().for_each(|value| {
-                target.anime_modify(value.attr, value.value);
-            });
+            // type_animation_ctx_mgr.anime(50);
+            // type_animation_ctx_mgr.animation_context_amount.animation_event(&mut listener, Some(&curve_frame_event));
+            // // 查询动画结果
+            // let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
+            // results.iter().for_each(|value| {
+            //     target.anime_modify(value.attr, value.value);
+            // });
+
+            type_animation_ctx_mgr.runtime_infos.reset();
+            type_animation_ctx_mgr.animation_context_amount.anime_curve_calc(30, &mut type_animation_ctx_mgr.runtime_infos);
+            for (group_id, ty, count) in type_animation_ctx_mgr.animation_context_amount.group_events.iter() {
+                println!("AG: {:?}, {:?}, {:?}", group_id, ty, count);
+            }
         }
 
     }
@@ -366,7 +372,7 @@ mod test01 {
             })],
         };
 
-        for i in 0..30 {
+        for i in 0..300 {
             // 动画运行
             type_animation_ctx_mgr.anime(50);
             type_animation_ctx_mgr.animation_context_amount.animation_event(&mut listener, Some(&curve_frame_event));
@@ -375,6 +381,136 @@ mod test01 {
             results.iter().for_each(|value| {
                 target.anime_modify(value.attr, value.value);
             });
+        }
+
+    }
+    
+    #[test]
+    fn test_frames() {
+        
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
+
+        // let mut map = SlotMap::default();
+        // map.
+
+        // 创建动画管理器
+        let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
+
+
+        // 创建动画曲线
+        let frame_count = 60 as FrameIndex;
+        let key_curve1 = 0;
+        let mut curve1 = FrameCurve::curve_frame_values(10000);
+        FrameCurve::curve_frame_values_frame(&mut curve1, 0, 0.0);
+        FrameCurve::curve_frame_values_frame(&mut curve1, 10000, 1.0);
+        println!("{:?}", curve1);
+        let curve1 = crate::AssetCurve::<f32>(Arc::new(curve1));
+        // 创建属性动画
+        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, curve1);
+
+        let mut targets = vec![]; [
+            Target0::default(type_animation_ctx_mgr.allocat_target_id()),
+            Target0::default(type_animation_ctx_mgr.allocat_target_id()),
+            Target0::default(type_animation_ctx_mgr.allocat_target_id()),
+        ];
+        // let mut listeners = vec![];
+        {
+            for i in 0..1 {
+                type_animation_ctx_mgr.runtime_infos.reset();
+                type_animation_ctx_mgr.animation_context_amount.anime_curve_calc(200, &mut type_animation_ctx_mgr.runtime_infos);
+                let mut list = replace(&mut type_animation_ctx_mgr.animation_context_amount.group_events, vec![]);
+                for (group_id, ty, count) in list.iter() {
+                    // println!("AG: {:?}, {:?}, {:?}", group_id, ty, count);
+                    match ty {
+                        pi_animation::animation_listener::EAnimationEvent::None => {},
+                        pi_animation::animation_listener::EAnimationEvent::Start => {},
+                        pi_animation::animation_listener::EAnimationEvent::End => {
+                            type_animation_ctx_mgr.animation_context_amount.del_animation_group(*group_id);
+                        },
+                        pi_animation::animation_listener::EAnimationEvent::Loop => {},
+                        pi_animation::animation_listener::EAnimationEvent::FrameEvent => {},
+                    }
+                }
+
+                for _ in 0..3 {
+                    targets.push(
+                        Target0::default(type_animation_ctx_mgr.allocat_target_id())
+                    );
+                    // 创建一个动画要作用的目标对象
+                    let target = targets.get(i).unwrap();
+                    // 创建动画组
+                    let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
+                    // 向动画组添加 动画
+                    type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, target.anime_target_id());
+                    // 启动动画组
+                    type_animation_ctx_mgr.animation_context_amount.start_complete(group0, -0.5 - (i % 5) as f32 * 0.1, ELoopMode::Not, 60, AnimationAmountCalc::default());
+                } 
+                
+                // // 创建动画监听器 - 监听动画组 group0
+                // let mut listener = AnimationListener::<TestFrameEventData> { 
+                //     group: group0,
+                //     on_start: vec![Box::new(|| {
+                //         println!("Group Event Start.");
+                //         Ok(EAnimationEventResult::RemoveListen)
+                //     })],
+                //     on_end: vec![Box::new(|| {
+                //         println!("Group Event End.");
+                //         Ok(EAnimationEventResult::RemoveListen)
+                //     })],
+                //     on_loop: vec![Box::new(|looped_count| {
+                //         println!("Group Event Loop {}.", looped_count);
+                //         Ok(EAnimationEventResult::None)
+                //     })],
+                //     on_frame_event: vec![Box::new(|events| {
+                //         events.iter().for_each(|v| {
+                //             println!("Group Event Frame Event {:?}.", v);
+                //         });
+                //         Ok(EAnimationEventResult::None)
+                //     })],
+                // };
+
+                // listeners.push(listener);
+            }
+        }
+
+        // 查询动画事件
+        // 创建帧事件
+        let mut curve_frame_event = CurveFrameEvent::<TestFrameEventData>::new(60.);
+        curve_frame_event.add(10, TestFrameEventData::Test0);
+        curve_frame_event.add(50, TestFrameEventData::Test1);
+
+        type_animation_ctx_mgr.animation_context_amount.log_groups();
+
+        for i in 0..200 {
+            // // 动画运行
+            // type_animation_ctx_mgr.anime(50);
+            
+            // for i in 0..3 {
+            //     let target = targets.get_mut(i).unwrap();
+            //     let listener = listeners.get_mut(i).unwrap();
+            //     type_animation_ctx_mgr.animation_context_amount.animation_event(listener, Some(&curve_frame_event));
+            //     // 查询动画结果
+            //     let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
+            //     results.iter().for_each(|value| {
+            //         target.anime_modify(value.attr, value.value);
+            //     });
+            // }
+            
+            type_animation_ctx_mgr.runtime_infos.reset();
+            type_animation_ctx_mgr.animation_context_amount.anime_curve_calc(40, &mut type_animation_ctx_mgr.runtime_infos);
+            let mut list = replace(&mut type_animation_ctx_mgr.animation_context_amount.group_events, vec![]);
+            for (group_id, ty, count) in list.iter() {
+                // println!("AG: {:?}, {:?}, {:?}", group_id, ty, count);
+                match ty {
+                    pi_animation::animation_listener::EAnimationEvent::None => {},
+                    pi_animation::animation_listener::EAnimationEvent::Start => {},
+                    pi_animation::animation_listener::EAnimationEvent::End => {
+                        type_animation_ctx_mgr.animation_context_amount.del_animation_group(*group_id);
+                    },
+                    pi_animation::animation_listener::EAnimationEvent::Loop => {},
+                    pi_animation::animation_listener::EAnimationEvent::FrameEvent => {},
+                }
+            }
         }
 
     }
