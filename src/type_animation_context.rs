@@ -145,31 +145,31 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
         self.ty
     }
 
-    /// 移除动画对应的曲线信息
-    /// * animations 为 AnimationContextAmount.del_animation_group 的返回值
-    pub fn remove(
-        &mut self,
-        animations: & Vec<AnimationInfo>,
-    ) {
-        animations.iter().for_each(|anime| {
-            if anime.ty == self.ty {
-                self.curves[anime.curve_id] = None;
-                self.id_pool.push(anime.curve_id);
-            }
-        });
-    }
+    // /// 移除动画对应的曲线信息
+    // /// * animations 为 AnimationContextAmount.del_animation_group 的返回值
+    // pub fn remove(
+    //     &mut self,
+    //     animations: & Vec<AnimationInfo>,
+    // ) {
+    //     animations.iter().for_each(|anime| {
+    //         if anime.ty == self.ty {
+    //             self.curves[anime.curve_id] = None;
+    //             self.id_pool.push(anime.curve_id);
+    //         }
+    //     });
+    // }
 
-    /// 移除动画对应的曲线信息
-    /// * animations 为 AnimationContextAmount.del_animation_group 的返回值
-    pub fn remove_one(
-        &mut self,
-        animation: &AnimationInfo,
-    ) {
-        if animation.ty == self.ty {
-            self.curves[animation.curve_id] = None;
-            self.id_pool.push(animation.curve_id);
-        }
-    }
+    // /// 移除动画对应的曲线信息
+    // /// * animations 为 AnimationContextAmount.del_animation_group 的返回值
+    // pub fn remove_one(
+    //     &mut self,
+    //     animation: &AnimationInfo,
+    // ) {
+    //     if animation.ty == self.ty {
+    //         self.curves[animation.curve_id] = None;
+    //         self.id_pool.push(animation.curve_id);
+    //     }
+    // }
 }
 
 /// 动画进度计算上下文
@@ -185,6 +185,7 @@ pub struct AnimationContextAmount<T: Clone, M: AnimationGroupManager<T>> {
     pub group_infos: SecondaryMap<DefaultKey, AnimationGroupRuntimeInfo>,
     pub time_scale: f32,
     pub group_events: Vec<(DefaultKey, EAnimationEvent, u32)>,
+    pub removed_animations: Vec<AnimationInfo>,
     mark: PhantomData<T>,
 }
 
@@ -195,6 +196,7 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
             group_infos: SecondaryMap::default(),
             time_scale: 1.0,
             group_events: vec![],
+            removed_animations: vec![],
             mark: PhantomData,
         }
     }
@@ -237,9 +239,9 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
     ) -> Option<&AnimationGroup<T>> {
         self.group_mgr.get(id)
     }
-    /// 删除动画组
-    /// 在 TypeAnimationContext.remove 使用 返回的 AnimationInfo
-    pub fn del_animation_group(&mut self, id: AnimationGroupID) -> Vec<AnimationInfo> {
+    /// 删除动画组 - 自动记录移除的 AnimationInfo,
+    /// 后续 在合适时机 调用 apply_removed_animations 和 clear_removed_animations
+    pub fn del_animation_group(&mut self, id: AnimationGroupID) {
         match self.group_infos.get_mut(id) {
             Some(group_info) => {
                 group_info.is_playing = false;
@@ -249,13 +251,47 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
                 group_info.start_event = false;
                 group_info.end_event = false;
                 group_info.loop_event = false;
-                self.group_mgr.del(id)
+                self.group_mgr.del(id).drain(..).for_each(|item| {
+                    self.removed_animations.push(item);
+                });
             }
             None => {
-                vec![]
             }
         }
     }
+    /// 在各动画数据类型的上下文 应用 动画的移除记录
+    pub fn apply_removed_animations<F: FrameDataValue, D: AsRef<FrameCurve<F>>>(&self, typectx: &mut TypeAnimationContext<F, D>) {
+        
+        self.removed_animations.iter().for_each(|anime| {
+            if anime.ty == typectx.ty {
+                typectx.curves[anime.curve_id] = None;
+                typectx.id_pool.push(anime.curve_id);
+            }
+        });
+    }
+    /// 清空 已移除动画的记录
+    pub fn clear_removed_animations(&mut self) {
+        self.removed_animations.clear();
+    }
+    // /// 删除动画组
+    // /// 在 TypeAnimationContext.remove 使用 返回的 AnimationInfo
+    // pub fn del_animation_group_no_record(&mut self, id: AnimationGroupID) -> Vec<AnimationInfo> {
+    //     match self.group_infos.get_mut(id) {
+    //         Some(group_info) => {
+    //             group_info.is_playing = false;
+    //             group_info.amount_in_second = 0.;
+    //             group_info.last_amount_in_second = 0.;
+    //             group_info.looped_count = 0;
+    //             group_info.start_event = false;
+    //             group_info.end_event = false;
+    //             group_info.loop_event = false;
+    //             self.group_mgr.del(id)
+    //         }
+    //         None => {
+    //             vec![]
+    //         }
+    //     }
+    // }
     /// 为动画组添加 Target动画
     pub fn add_target_animation<F: FrameDataValue, D: AsRef<FrameCurve<F>>>(
         &mut self,
@@ -304,7 +340,7 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
                 false => {
                     group_info.is_playing = true;
                     self.group_mgr.get_mut(id).unwrap().start_complete(
-                        seconds,
+                        seconds.abs(),
                         loop_mode,
                         frame_per_second,
                         amount_calc,

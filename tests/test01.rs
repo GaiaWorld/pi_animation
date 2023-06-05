@@ -102,7 +102,6 @@ pub struct TypeAnimationContextMgr {
     // pub target_allocator: IDAnimatableTargetAllocatorDefault,
 	pub target_allocator: SlotMap<DefaultKey, ()>,
     pub ty_allocator: KeyFrameDataTypeAllocator,
-    pub animation_context_amount: AnimationContextAmount<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>,
 }
 
 impl TypeAnimationContextMgr {
@@ -110,10 +109,8 @@ impl TypeAnimationContextMgr {
         let mut runtime_infos = RuntimeInfoMap::default();
         // let mut curve_infos = FrameCurveInfoManager::default();
         let mut target_allocator = SlotMap::default();
-        let mut animation_context_amount = AnimationContextAmount::default(AnimationGroupManagerDefault::default());
         let mut ty_allocator = KeyFrameDataTypeAllocator::default();
 
-        animation_context_amount.debug(true);
 
         let value0_ctx = TypeAnimationContext::new(ty_allocator.alloc().unwrap(), &mut runtime_infos);
         let value0_result_pool = TypeAnimationResultPoolDefault::default();
@@ -127,17 +124,18 @@ impl TypeAnimationContextMgr {
             f32_ctx, f32_result_pool,
             runtime_infos,
             // curve_infos,
-            target_allocator, animation_context_amount, ty_allocator,  }
+            target_allocator, ty_allocator,  }
     }
 
     /// 运行动画
     pub fn anime(
         &mut self,
+        animation_context_amount: &mut AnimationContextAmount<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>,
         delta_ms: u64,
     ) -> Result<(), Vec<EAnimationError>> {
         self.reset();
 
-        self.animation_context_amount.anime_curve_calc(delta_ms, &mut self.runtime_infos);
+        animation_context_amount.anime_curve_calc(delta_ms, &mut self.runtime_infos);
 
         let mut r0 = self.value0_ctx.anime(&self.runtime_infos, &mut self.value0_result_pool);
         let r1 = self.value1_ctx.anime(&self.runtime_infos, &mut self.value1_result_pool);
@@ -152,11 +150,12 @@ impl TypeAnimationContextMgr {
     /// 运行动画
     pub fn anime_uncheck(
         &mut self,
+        animation_context_amount: &mut AnimationContextAmount<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>,
         delta_ms: u64,
     ) {
         self.reset();
 
-        self.animation_context_amount.anime_curve_calc(delta_ms, &mut self.runtime_infos);
+        animation_context_amount.anime_curve_calc(delta_ms, &mut self.runtime_infos);
 
         self.value0_ctx.anime_uncheck(&self.runtime_infos, &mut self.value0_result_pool);
         self.value1_ctx.anime_uncheck(&self.runtime_infos, &mut self.value1_result_pool);
@@ -196,9 +195,9 @@ impl<F: FrameDataValue> AsRef<FrameCurve<F>> for AssetCurve<F> {
 mod test01 {
     use std::{sync::Arc, mem::replace};
 
-    use pi_animation::{animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc};
+    use pi_animation::{type_animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc, animation_group_manager::AnimationGroupManagerDefault};
     use pi_curves::{curve::{frame_curve::FrameCurve, FrameIndex, frame::KeyFrameCurveValue}, easing::EEasingMode, steps::EStepMode};
-    use pi_slotmap::SlotMap;
+    use pi_slotmap::{SlotMap, DefaultKey};
     use test::{Bencher};
 
     use crate::{TypeAnimationContextMgr, Value0, Target0, Target0AnimatableAttrSet, AssetCurve};
@@ -207,6 +206,9 @@ mod test01 {
     fn test_animatable_float1() {
         // 创建动画管理器
         let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
+        
+        let mut animation_context_amount = AnimationContextAmount::<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>::default(AnimationGroupManagerDefault::default());
+        animation_context_amount.debug(true);
 
         // 创建一个动画要作用的目标对象
         let mut target = Target0::default(type_animation_ctx_mgr.allocat_target_id());
@@ -219,14 +221,14 @@ mod test01 {
         let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, curve1);
 
         // 创建动画组
-        let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
+        let group0 = animation_context_amount.create_animation_group();
         // 向动画组添加 动画
-        type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, target.anime_target_id());
+        animation_context_amount.add_target_animation_notype(animation0, group0, target.anime_target_id());
         // 启动动画组
-        type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
+        animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
 
         // 动画运行
-        type_animation_ctx_mgr.anime(100);
+        type_animation_ctx_mgr.anime(&mut animation_context_amount, 100);
 
         // 查询动画结果
         let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
@@ -250,6 +252,8 @@ mod test01 {
 
         // 创建动画管理器
         let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
+        let mut animation_context_amount = AnimationContextAmount::<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>::default(AnimationGroupManagerDefault::default());
+        animation_context_amount.debug(true);
 
         // 创建一个动画要作用的目标对象
         let mut target = Target0::default(type_animation_ctx_mgr.allocat_target_id());
@@ -263,11 +267,11 @@ mod test01 {
         let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, curve1);
 
         // 创建动画组
-        let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
+        let group0 = animation_context_amount.create_animation_group();
         // 向动画组添加 动画
-        type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, target.anime_target_id());
+        animation_context_amount.add_target_animation_notype(animation0, group0, target.anime_target_id());
         // 启动动画组
-        type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
+        animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
 
 
         // 查询动画事件
@@ -301,7 +305,7 @@ mod test01 {
         for i in 0..100 {
             // 动画运行
             // type_animation_ctx_mgr.anime(50);
-            // type_animation_ctx_mgr.animation_context_amount.animation_event(&mut listener, Some(&curve_frame_event));
+            // animation_context_amount.animation_event(&mut listener, Some(&curve_frame_event));
             // // 查询动画结果
             // let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
             // results.iter().for_each(|value| {
@@ -309,8 +313,8 @@ mod test01 {
             // });
 
             type_animation_ctx_mgr.runtime_infos.reset();
-            type_animation_ctx_mgr.animation_context_amount.anime_curve_calc(30, &mut type_animation_ctx_mgr.runtime_infos);
-            for (group_id, ty, count) in type_animation_ctx_mgr.animation_context_amount.group_events.iter() {
+            animation_context_amount.anime_curve_calc(30, &mut type_animation_ctx_mgr.runtime_infos);
+            for (group_id, ty, count) in animation_context_amount.group_events.iter() {
                 println!("AG: {:?}, {:?}, {:?}", group_id, ty, count);
             }
         }
@@ -325,6 +329,8 @@ mod test01 {
 
         // 创建动画管理器
         let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
+        let mut animation_context_amount = AnimationContextAmount::<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>::default(AnimationGroupManagerDefault::default());
+        animation_context_amount.debug(true);
 
         // 创建一个动画要作用的目标对象
         let mut target = Target0::default(type_animation_ctx_mgr.allocat_target_id());
@@ -338,11 +344,11 @@ mod test01 {
         let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, curve1);
 
         // 创建动画组
-        let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
+        let group0 = animation_context_amount.create_animation_group();
         // 向动画组添加 动画
-        type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, target.anime_target_id());
+        animation_context_amount.add_target_animation_notype(animation0, group0, target.anime_target_id());
         // 启动动画组
-        type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::from_steps(5, EStepMode::JumpNone));
+        animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::from_steps(5, EStepMode::JumpNone));
 
         // 查询动画事件
         // 创建帧事件
@@ -374,8 +380,8 @@ mod test01 {
 
         for i in 0..300 {
             // 动画运行
-            type_animation_ctx_mgr.anime(50);
-            type_animation_ctx_mgr.animation_context_amount.animation_event(&mut listener, Some(&curve_frame_event));
+            type_animation_ctx_mgr.anime(&mut animation_context_amount, 50);
+            animation_context_amount.animation_event(&mut listener, Some(&curve_frame_event));
             // 查询动画结果
             let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
             results.iter().for_each(|value| {
@@ -395,6 +401,8 @@ mod test01 {
 
         // 创建动画管理器
         let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
+        let mut animation_context_amount = AnimationContextAmount::<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>::default(AnimationGroupManagerDefault::default());
+        animation_context_amount.debug(true);
 
 
         // 创建动画曲线
@@ -405,8 +413,6 @@ mod test01 {
         FrameCurve::curve_frame_values_frame(&mut curve1, 10000, 1.0);
         println!("{:?}", curve1);
         let curve1 = crate::AssetCurve::<f32>(Arc::new(curve1));
-        // 创建属性动画
-        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, curve1);
 
         let mut targets = vec![]; [
             Target0::default(type_animation_ctx_mgr.allocat_target_id()),
@@ -417,15 +423,15 @@ mod test01 {
         {
             for i in 0..1 {
                 type_animation_ctx_mgr.runtime_infos.reset();
-                type_animation_ctx_mgr.animation_context_amount.anime_curve_calc(200, &mut type_animation_ctx_mgr.runtime_infos);
-                let mut list = replace(&mut type_animation_ctx_mgr.animation_context_amount.group_events, vec![]);
+                animation_context_amount.anime_curve_calc(200, &mut type_animation_ctx_mgr.runtime_infos);
+                let mut list = replace(&mut animation_context_amount.group_events, vec![]);
                 for (group_id, ty, count) in list.iter() {
-                    // println!("AG: {:?}, {:?}, {:?}", group_id, ty, count);
+                    println!("AG 0: {:?}, {:?}, {:?}", group_id, ty, count);
                     match ty {
                         pi_animation::animation_listener::EAnimationEvent::None => {},
                         pi_animation::animation_listener::EAnimationEvent::Start => {},
                         pi_animation::animation_listener::EAnimationEvent::End => {
-                            type_animation_ctx_mgr.animation_context_amount.del_animation_group(*group_id);
+                            animation_context_amount.del_animation_group(*group_id);
                         },
                         pi_animation::animation_listener::EAnimationEvent::Loop => {},
                         pi_animation::animation_listener::EAnimationEvent::FrameEvent => {},
@@ -439,11 +445,13 @@ mod test01 {
                     // 创建一个动画要作用的目标对象
                     let target = targets.get(i).unwrap();
                     // 创建动画组
-                    let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
+                    let group0 = animation_context_amount.create_animation_group();
+                    // 创建属性动画
+                    let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, curve1.clone());
                     // 向动画组添加 动画
-                    type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation0, group0, target.anime_target_id());
+                    animation_context_amount.add_target_animation_notype(animation0, group0, target.anime_target_id());
                     // 启动动画组
-                    type_animation_ctx_mgr.animation_context_amount.start_complete(group0, -0.5 - (i % 5) as f32 * 0.1, ELoopMode::Not, 60, AnimationAmountCalc::default());
+                    animation_context_amount.start_complete(group0, -0.5 - (i % 5) as f32 * 0.1, ELoopMode::Not, 60, AnimationAmountCalc::default());
                 } 
                 
                 // // 创建动画监听器 - 监听动画组 group0
@@ -479,7 +487,7 @@ mod test01 {
         curve_frame_event.add(10, TestFrameEventData::Test0);
         curve_frame_event.add(50, TestFrameEventData::Test1);
 
-        type_animation_ctx_mgr.animation_context_amount.log_groups();
+        // animation_context_amount.log_groups();
 
         for i in 0..200 {
             // // 动画运行
@@ -488,7 +496,7 @@ mod test01 {
             // for i in 0..3 {
             //     let target = targets.get_mut(i).unwrap();
             //     let listener = listeners.get_mut(i).unwrap();
-            //     type_animation_ctx_mgr.animation_context_amount.animation_event(listener, Some(&curve_frame_event));
+            //     animation_context_amount.animation_event(listener, Some(&curve_frame_event));
             //     // 查询动画结果
             //     let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
             //     results.iter().for_each(|value| {
@@ -497,15 +505,15 @@ mod test01 {
             // }
             
             type_animation_ctx_mgr.runtime_infos.reset();
-            type_animation_ctx_mgr.animation_context_amount.anime_curve_calc(40, &mut type_animation_ctx_mgr.runtime_infos);
-            let mut list = replace(&mut type_animation_ctx_mgr.animation_context_amount.group_events, vec![]);
+            animation_context_amount.anime_curve_calc(40, &mut type_animation_ctx_mgr.runtime_infos);
+            let mut list = replace(&mut animation_context_amount.group_events, vec![]);
             for (group_id, ty, count) in list.iter() {
-                // println!("AG: {:?}, {:?}, {:?}", group_id, ty, count);
+                println!("AG 1: {:?}, {:?}, {:?}", group_id, ty, count);
                 match ty {
                     pi_animation::animation_listener::EAnimationEvent::None => {},
                     pi_animation::animation_listener::EAnimationEvent::Start => {},
                     pi_animation::animation_listener::EAnimationEvent::End => {
-                        type_animation_ctx_mgr.animation_context_amount.del_animation_group(*group_id);
+                        animation_context_amount.del_animation_group(*group_id);
                     },
                     pi_animation::animation_listener::EAnimationEvent::Loop => {},
                     pi_animation::animation_listener::EAnimationEvent::FrameEvent => {},
@@ -522,6 +530,8 @@ mod test01 {
         let group_range = 100;
         let group_animation_range = 1000;
         let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
+        let mut animation_context_amount = AnimationContextAmount::<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>::default(AnimationGroupManagerDefault::default());
+        animation_context_amount.debug(true);
 
         let frame_count = 60 as FrameIndex;
         // MinMaxCurve
@@ -547,7 +557,7 @@ mod test01 {
 
         // 添加 10 动画组 每组 10000 动画
         for i in 0..group_range {
-            let group0 = type_animation_ctx_mgr.animation_context_amount.create_animation_group();
+            let group0 = animation_context_amount.create_animation_group();
             for j in 0..group_animation_range {
                 let animation = if j % 2 == 0 {
                     // 创建属性动画
@@ -556,15 +566,15 @@ mod test01 {
                     // 创建属性动画
                     type_animation_ctx_mgr.value0_ctx.create_animation(Target0AnimatableAttrSet::V0a as IDAnimatableAttr, curve1.clone())
                 };
-                type_animation_ctx_mgr.animation_context_amount.add_target_animation(animation, group0, targets.get(j).unwrap().anime_target_id());
+                animation_context_amount.add_target_animation_notype(animation, group0, targets.get(j).unwrap().anime_target_id());
             }
-            type_animation_ctx_mgr.animation_context_amount.start(group0, 1.0, ELoopMode::Opposite(None), 0.0, frame_count as KeyFrameCurveValue, 60, AnimationAmountCalc::default());
+            animation_context_amount.start(group0, 1.0, ELoopMode::Opposite(None), 0.0, frame_count as KeyFrameCurveValue, 60, AnimationAmountCalc::default());
         }
-        type_animation_ctx_mgr.animation_context_amount.debug(true);
+        animation_context_amount.debug(true);
         // 测试 动画性能 计 10w 个动画计算 & 10_000 个对象的数据修改
         b.iter(move || {
 
-            type_animation_ctx_mgr.anime(1);
+            type_animation_ctx_mgr.anime(&mut animation_context_amount, 1);
             // type_animation_ctx_mgr.anime_uncheck(1);
 
             let mut ii = 0;

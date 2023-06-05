@@ -203,7 +203,7 @@ impl<T: Clone> AnimationGroup<T> {
         let speed = 1.0 / seconds;
         let from = 0.;
         let to = self.max_frame as KeyFrameCurveValue;
-        self.start(speed, loop_mode, from, to, frame_per_second, group_info, amount_calc)
+        self.start(speed.abs(), loop_mode, from, to, frame_per_second, group_info, amount_calc)
     }
     /// 启动动画组
     /// * `speed` 动画速度 - 正常速度为 1
@@ -222,7 +222,7 @@ impl<T: Clone> AnimationGroup<T> {
         group_info: &mut AnimationGroupRuntimeInfo,
         amount_calc: AnimationAmountCalc,
     ) {
-        self.start(speed, loop_mode, from * self.max_frame, to * self.max_frame, frame_per_second, group_info, amount_calc)
+        self.start(speed.abs(), loop_mode, from * self.max_frame, to * self.max_frame, frame_per_second, group_info, amount_calc)
     }
     /// 启动动画组
     /// * `speed` 动画速度 - 正常速度为 1
@@ -242,7 +242,7 @@ impl<T: Clone> AnimationGroup<T> {
         amount_calc: AnimationAmountCalc,
     ) {
         self.is_playing = true;
-        self.speed = speed;
+        self.speed = speed.abs();
         self.delay_time = 0.;
         self.looped_count = 0;
         self.detal_ms_record = 0.;

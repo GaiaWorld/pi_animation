@@ -6,7 +6,7 @@ pub type AnimationID = usize;
 
 /// 属性动画 数据结构
 /// * 关联 属性ID 和 动画曲线
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct AnimationInfo {
     /// 属性ID
     pub attr: IDAnimatableAttr,

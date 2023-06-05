@@ -15,6 +15,7 @@ serde = { version = "1.0", features = ["derive"], option=true }
 pi_atom = { version="0.2", features = ["serde"] }
 pi_slotmap = "0.1"
 pi_hash = "0.1"
+pi_share = "0.4"
 
 pi_curves = { git = "https://github.com/GaiaWorld/pi_curves"}
 
