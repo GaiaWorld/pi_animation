@@ -124,7 +124,7 @@ impl<T: Clone> AnimationGroup<T> {
             if group_info.start_event || self.detal_ms_record >= self.frame_ms || self.debug {
                 let amount_call = &self.amount;
     
-                let (mut amount, loop_count) = amount_call(self.once_time, self.delay_time);
+                let (mut amount, loop_count) = amount_call(self.once_time + self.frame_ms * 0.5, self.delay_time);
 
                 if self.looped_count != loop_count {
                     match self.loop_count {

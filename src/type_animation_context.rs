@@ -238,6 +238,7 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
         self.group_mgr.get(id)
     }
     /// 删除动画组
+    /// 在 TypeAnimationContext.remove 使用 返回的 AnimationInfo
     pub fn del_animation_group(&mut self, id: AnimationGroupID) -> Vec<AnimationInfo> {
         match self.group_infos.get_mut(id) {
             Some(group_info) => {
@@ -256,7 +257,23 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
         }
     }
     /// 为动画组添加 Target动画
-    pub fn add_target_animation(
+    pub fn add_target_animation<F: FrameDataValue, D: AsRef<FrameCurve<F>>>(
+        &mut self,
+        type_ctx: &mut TypeAnimationContext<F, D>,
+        curve: D,
+        group_id: AnimationGroupID,
+        target: T,
+    ) -> Result<(), EAnimationError> {
+        match self.group_mgr.get_mut(group_id) {
+            Some(group) => {
+                let animation = type_ctx.create_animation(0, curve);
+                group.add_target_animation(TargetAnimation { target, animation })
+            },
+            None => Err(EAnimationError::AnimationGroupNotFound),
+        }
+    }
+    /// 为动画组添加 Target动画
+    pub fn add_target_animation_notype(
         &mut self,
         animation: AnimationInfo,
         group_id: AnimationGroupID,
