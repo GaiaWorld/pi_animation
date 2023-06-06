@@ -159,17 +159,22 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
     //     });
     // }
 
-    // /// 移除动画对应的曲线信息
-    // /// * animations 为 AnimationContextAmount.del_animation_group 的返回值
-    // pub fn remove_one(
-    //     &mut self,
-    //     animation: &AnimationInfo,
-    // ) {
-    //     if animation.ty == self.ty {
-    //         self.curves[animation.curve_id] = None;
-    //         self.id_pool.push(animation.curve_id);
-    //     }
-    // }
+    /// 移除动画对应的曲线信息
+    /// * animations 为 AnimationContextAmount.del_animation_group 的返回值
+    pub fn remove_one(
+        &mut self,
+        animation: &AnimationInfo,
+    ) {
+        if animation.ty == self.ty {
+            self.curves[animation.curve_id] = None;
+            self.id_pool.push(animation.curve_id);
+        }
+    }
+}
+
+pub trait AnimationContextMgr {
+	/// 移除曲线
+	fn remove_curve(&mut self, info: &AnimationInfo);
 }
 
 /// 动画进度计算上下文
@@ -239,6 +244,24 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
     ) -> Option<&AnimationGroup<T>> {
         self.group_mgr.get(id)
     }
+	pub fn remove_animation_group<AM: AnimationContextMgr>(&mut self, id: AnimationGroupID, mgr: &mut AM) {
+		match self.group_infos.get_mut(id) {
+            Some(group_info) => {
+                group_info.is_playing = false;
+                group_info.amount_in_second = 0.;
+                group_info.last_amount_in_second = 0.;
+                group_info.looped_count = 0;
+                group_info.start_event = false;
+                group_info.end_event = false;
+                group_info.loop_event = false;
+                self.group_mgr.del(id).drain(..).for_each(|item| {
+					mgr.remove_curve(&item);
+                });
+            }
+            None => {
+            }
+        }
+	}
     /// 删除动画组 - 自动记录移除的 AnimationInfo,
     /// 后续 在合适时机 调用 apply_removed_animations 和 clear_removed_animations
     pub fn del_animation_group(&mut self, id: AnimationGroupID) {
