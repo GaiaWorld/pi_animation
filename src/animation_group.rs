@@ -28,7 +28,7 @@ pub struct AnimationGroupRuntimeInfo {
 /// * 计算动画进度
 /// * 更新动画进度到内部的各个动画
 /// * 响应动画事件
-pub struct AnimationGroup<T: Clone> {
+pub struct AnimationGroup<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
     // animatable_target_id: T,
     id: AnimationGroupID,
     animations: Vec<TargetAnimation<T>>,
@@ -56,7 +56,7 @@ pub struct AnimationGroup<T: Clone> {
     once_time: KeyFrameCurveValue,
     is_playing: bool,
     /// 动画组的混合权重
-    blend_weight: f32,
+    pub(crate) blend_weight: f32,
     /// 动画组的在秒单位下的进度
     amount_in_second: KeyFrameCurveValue,
     amount: fn(KeyFrameCurveValue, KeyFrameCurveValue) -> (KeyFrameCurveValue, u32),
@@ -65,7 +65,7 @@ pub struct AnimationGroup<T: Clone> {
     pub debug: bool,
 }
 
-impl<T: Clone> AnimationGroup<T> {
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
     pub fn new() -> Self {
         Self {
             // animatable_target_id,
@@ -384,7 +384,7 @@ pub enum AnimationGroupAnimatableAttrSet {
 //     }
 // }
 /// 为 AnimationGroup 实现 TAnimatableTargetModifier
-impl<T: Clone> TAnimatableTargetModifier<f32> for AnimationGroup<T> {
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> TAnimatableTargetModifier<f32> for AnimationGroup<T> {
     fn anime_modify(&mut self, attr: IDAnimatableAttr, value: f32) -> Result<(), EAnimationError> {
         if attr == AnimationGroupAnimatableAttrSet::BlendWeight as IDAnimatableAttr {
             self.blend_weight = value;

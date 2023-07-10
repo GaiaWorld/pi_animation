@@ -38,7 +38,7 @@ pub struct TypeAnimationContext<F: FrameDataValue, D: AsRef<FrameCurve<F>>> {
 }
 
 impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
-    pub fn new<T: Clone>(
+    pub fn new<T: Clone  + PartialEq + Eq + PartialOrd + Ord>(
         ty: usize,
         runtime_info_map: &mut RuntimeInfoMap<T>,
     ) -> Self {
@@ -88,7 +88,7 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
 
     }
     /// 使用曲线计算结果 计算属性值
-    pub fn anime<T: Clone, R: TypeAnimationResultPool<F, T>>(
+    pub fn anime<T: Clone + PartialEq + Eq + PartialOrd + Ord, R: TypeAnimationResultPool<F, T>>(
         &self,
         runtime_infos: &RuntimeInfoMap<T>,
         result_pool: &mut R,
@@ -122,7 +122,7 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
     }
 
     /// 使用曲线计算结果 计算属性值
-    pub fn anime_uncheck<T: Clone, R: TypeAnimationResultPool<F, T>>(
+    pub fn anime_uncheck<T: Clone + PartialEq + Eq + PartialOrd + Ord, R: TypeAnimationResultPool<F, T>>(
         &self,
         runtime_infos: &RuntimeInfoMap<T>,
         result_pool: &mut R,
@@ -184,7 +184,7 @@ pub trait AnimationContextMgr {
 /// * 自身也是可动画的目标
 ///   * 可动画的属性为
 ///     * time_scale
-pub struct AnimationContextAmount<T: Clone, M: AnimationGroupManager<T>> {
+pub struct AnimationContextAmount<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> {
     pub group_mgr: M,
     // pub group_infos: Vec<AnimationGroupRuntimeInfo>,
     pub group_infos: SecondaryMap<DefaultKey, AnimationGroupRuntimeInfo>,
@@ -194,7 +194,7 @@ pub struct AnimationContextAmount<T: Clone, M: AnimationGroupManager<T>> {
     mark: PhantomData<T>,
 }
 
-impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
     pub fn default(group_mgr: M) -> Self {
         Self {
             group_mgr,
@@ -243,6 +243,15 @@ impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
         id: AnimationGroupID,
     ) -> Option<&AnimationGroup<T>> {
         self.group_mgr.get(id)
+    }
+    pub fn animation_group_weight(
+        &mut self,
+        id: AnimationGroupID,
+        weight: f32,
+    ) {
+        if let Some(group) = self.group_mgr.get_mut(id) {
+            group.blend_weight = weight;
+        }
     }
 	pub fn remove_animation_group<AM: AnimationContextMgr>(&mut self, id: AnimationGroupID, mgr: &mut AM) {
 		match self.group_infos.get_mut(id) {
@@ -587,7 +596,7 @@ pub enum AnimationContextAmountAnimatableAttrSet {
 //     }
 // }
 /// 为 AnimationContextAmount 实现 TAnimatableTargetModifier
-impl<T: Clone, M: AnimationGroupManager<T>> TAnimatableTargetModifier<f32>
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> TAnimatableTargetModifier<f32>
     for AnimationContextAmount<T, M>
 {
     fn anime_modify(&mut self, attr: IDAnimatableAttr, value: f32) -> Result<(), EAnimationError> {

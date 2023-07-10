@@ -30,7 +30,7 @@ use crate::{
 /// * 自身也是可动画的目标
 ///   * 可动画的属性为
 ///     * time_scale
-pub struct AnimationContextAmount<T: Clone, M: AnimationGroupManager<T>> {
+pub struct AnimationContextAmount<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> {
     pub group_mgr: M,
     // pub group_infos: Vec<AnimationGroupRuntimeInfo>,
     pub group_infos: SecondaryMap<DefaultKey, AnimationGroupRuntimeInfo>,
@@ -39,7 +39,7 @@ pub struct AnimationContextAmount<T: Clone, M: AnimationGroupManager<T>> {
     mark: PhantomData<T>,
 }
 
-impl<T: Clone, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
     pub fn default(group_mgr: M) -> Self {
         Self {
             group_mgr,
@@ -354,7 +354,7 @@ pub enum AnimationContextAmountAnimatableAttrSet {
 //     }
 // }
 /// 为 AnimationContextAmount 实现 TAnimatableTargetModifier
-impl<T: Clone, M: AnimationGroupManager<T>> TAnimatableTargetModifier<f32>
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> TAnimatableTargetModifier<f32>
     for AnimationContextAmount<T, M>
 {
     fn anime_modify(&mut self, attr: IDAnimatableAttr, value: f32) -> Result<(), EAnimationError> {

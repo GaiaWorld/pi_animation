@@ -8,7 +8,7 @@ use crate::{
 
 /// 一个动画的运行时数据
 #[derive(Debug, Clone, Copy)]
-pub struct RuntimeInfo<T: Clone> {
+pub struct RuntimeInfo<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
     // pub group_info: AnimationGroupRuntimeInfo,
     /// 所属动画组的权重
     pub group_weight: f32,
@@ -22,14 +22,33 @@ pub struct RuntimeInfo<T: Clone> {
     pub curve_id: FrameCurveInfoID,
     // pub anime: TargetAnimation,
 }
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> PartialEq for RuntimeInfo<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.target == other.target
+    }
+}
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> Eq for RuntimeInfo<T> {
+    fn assert_receiver_is_total_eq(&self) {}
+}
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> Ord for RuntimeInfo<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.target.cmp(&other.target)
+    }
+}
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> PartialOrd for RuntimeInfo<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.target.partial_cmp(&other.target)
+    }
+}
 
 /// 运行时信息表 - 唯一
 /// 每个 Vec<RuntimeInfo> 分别对应一个 动画数据类型
-pub struct RuntimeInfoMap<T: Clone> {
+pub struct RuntimeInfoMap<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
+    /// 保证按 动画作用目标排序
     pub list: Vec<Vec<RuntimeInfo<T>>>,
 }
 
-impl<T: Clone> RuntimeInfoMap<T> {
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> RuntimeInfoMap<T> {
     pub fn default() -> Self {
         Self { list: vec![] }
     }
@@ -49,7 +68,10 @@ impl<T: Clone> RuntimeInfoMap<T> {
     ) -> Result<(), EAnimationError> {
         match self.list.get_mut(ty) {
             Some(list) => {
-                list.push(info);
+                match list.binary_search(&info) {
+                    Ok(idx) => list.insert(idx, info),
+                    Err(idx) => list.insert(idx, info),
+                }
                 Ok(())
             }
             None => {
