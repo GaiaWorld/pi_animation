@@ -39,13 +39,11 @@ pub struct AnimationGroup<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
     from: KeyFrameCurveValue,
     to: KeyFrameCurveValue,
     /// 动画组有效运行时间
-    delay_time: KeyFrameCurveValue,
+    delay_time_ms: KeyFrameCurveValue,
     /// 动画组循环记录
     looped_count: u32,
     /// 动画组循环模式
     loop_mode: ELoopMode,
-    /// 设计每秒帧数据分辨率 - 速度为 1 的情况下
-    frame_per_second: FramePerSecond,
     /// 累计未运行动画的有效间隔时间
     detal_ms_record: KeyFrameCurveValue,
     /// 动画组运行的帧间隔时长
@@ -53,7 +51,7 @@ pub struct AnimationGroup<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
     /// 动画组使用的动画集合中最大帧数
     max_frame: KeyFrameCurveValue,
     /// 动画组运行一次的时间 - ms
-    once_time: KeyFrameCurveValue,
+    once_time_ms: KeyFrameCurveValue,
     is_playing: bool,
     /// 动画组的混合权重
     pub(crate) blend_weight: f32,
@@ -66,6 +64,8 @@ pub struct AnimationGroup<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
 }
 
 impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
+    /// 设计每秒帧数据分辨率 - 速度为 1 的情况下
+    pub const BASE_FPS: FramePerSecond = 60 as FramePerSecond;
     pub fn new() -> Self {
         Self {
             // animatable_target_id,
@@ -75,14 +75,13 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
             speed: 1.,
             from: 0.,
             to: 1.,
-            delay_time: 0.,
+            delay_time_ms: 0.,
             looped_count: 0,
             loop_mode: ELoopMode::Not,
-            frame_per_second: 60,
             frame_ms: 16.6,
             detal_ms_record: 0.,
             max_frame: 0.,
-            once_time: 1.,
+            once_time_ms: 1.,
             is_playing: false,
             blend_weight: 1.0,
             amount_in_second: 0.,
@@ -114,7 +113,7 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
         group_info.last_amount_in_second = self.amount_in_second;
 
         if self.is_playing {
-            if self.delay_time.abs() < 0.00001 {
+            if self.delay_time_ms.abs() < 0.00001 {
                 group_info.start_event = true;
             }
 
@@ -124,7 +123,7 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
             if group_info.start_event || self.detal_ms_record >= self.frame_ms || self.debug {
                 let amount_call = &self.amount;
     
-                let (mut amount, loop_count) = amount_call(self.once_time + self.frame_ms * 0.5, self.delay_time);
+                let (mut amount, loop_count) = amount_call(self.once_time_ms + self.frame_ms * 0.5, self.delay_time_ms);
 
                 if self.looped_count != loop_count {
                     match self.loop_count {
@@ -160,9 +159,9 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
                 }
     
                 let anime_amount = self.amount_calc.calc(amount);
-                let amount_in_second = anime_amount + self.from / self.frame_per_second as KeyFrameCurveValue;
+                let amount_in_second = anime_amount * self.once_time_ms / (1000.0 as KeyFrameCurveValue) + self.from / Self::BASE_FPS as KeyFrameCurveValue;
     
-                log::trace!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time, self.delay_time, amount, anime_amount, amount_in_second);
+                log::trace!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time_ms, self.delay_time_ms, amount, anime_amount, amount_in_second);
     
                 self.looped_count = loop_count;
                 self.amount_in_second = amount_in_second;
@@ -172,7 +171,7 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
 
                 self.update_to_infos(runtime_infos);
 
-                self.delay_time += self.detal_ms_record * self.speed;
+                self.delay_time_ms += self.detal_ms_record * self.speed;
                 self.detal_ms_record = 0.;
             }
         }
@@ -183,7 +182,7 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
         target_animation: TargetAnimation<T>,
     ) -> Result<(), EAnimationError> {
         // println!("{}", self.max_frame);
-        self.max_frame = KeyFrameCurveValue::max(self.max_frame, target_animation.animation.get_max_frame_for_running_speed(self.frame_per_second));
+        self.max_frame = KeyFrameCurveValue::max(self.max_frame, target_animation.animation.get_max_frame_for_running_speed(Self::BASE_FPS));
         // println!("add_target_animation {}", self.max_frame);
         self.animations.push(target_animation);
         Ok(())
@@ -243,7 +242,7 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
     ) {
         self.is_playing = true;
         self.speed = speed.abs();
-        self.delay_time = 0.;
+        self.delay_time_ms = 0.;
         self.looped_count = 0;
         self.detal_ms_record = 0.;
         self.amount_in_second = 0.;
@@ -263,23 +262,23 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
         match loop_mode {
             ELoopMode::Opposite(v) => {
                 self.loop_count = v;
-                self.amount_in_second = to / self.frame_per_second as KeyFrameCurveValue;
+                self.amount_in_second = to / Self::BASE_FPS as KeyFrameCurveValue;
             },
             ELoopMode::OppositePly(v) => {
                 self.loop_count = v;
-                self.amount_in_second = to / self.frame_per_second as KeyFrameCurveValue;
+                self.amount_in_second = to / Self::BASE_FPS as KeyFrameCurveValue;
             },
             ELoopMode::Positive(v) => {
                 self.loop_count = v;
-                self.amount_in_second = from / self.frame_per_second as KeyFrameCurveValue;
+                self.amount_in_second = from / Self::BASE_FPS as KeyFrameCurveValue;
             },
             ELoopMode::PositivePly(v) => {
                 self.loop_count = v;
-                self.amount_in_second = from / self.frame_per_second as KeyFrameCurveValue;
+                self.amount_in_second = from / Self::BASE_FPS as KeyFrameCurveValue;
             },
             ELoopMode::Not => {
                 self.loop_count = Some(1);
-                self.amount_in_second = from / self.frame_per_second as KeyFrameCurveValue;
+                self.amount_in_second = from / Self::BASE_FPS as KeyFrameCurveValue;
             },
         }
 
@@ -308,7 +307,7 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
         &mut self,
     ) {
         // println!("self.from {}, self.to {}", self.from, self.to);
-        self.once_time = (self.to - self.from) as KeyFrameCurveValue / self.frame_per_second as KeyFrameCurveValue * 1000.0;
+        self.once_time_ms = (self.to - self.from) as KeyFrameCurveValue / Self::BASE_FPS as KeyFrameCurveValue * 1000.0;
     }
     fn from(
         &mut self,

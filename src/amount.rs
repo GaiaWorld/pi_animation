@@ -1,5 +1,5 @@
 
-use pi_curves::{EAmountMode, AmountParam, steps::EStepMode, curve::frame::KeyFrameCurveValue, easing::EEasingMode};
+use pi_curves::{EAmountMode, AmountParam, steps::EStepMode, curve::{frame::KeyFrameCurveValue, FrameIndex}, easing::EEasingMode};
 
 pub struct AnimationAmountCalc {
     mode: EAmountMode,
@@ -21,7 +21,7 @@ impl AnimationAmountCalc {
     pub fn mode(&self) -> EAmountMode {
         self.mode
     }
-    pub fn from_steps(step: u16, mode: EStepMode) -> Self {
+    pub fn from_steps(step: FrameIndex, mode: EStepMode) -> Self {
         if step <= 1 {
             AnimationAmountCalc::default()
         } else {
