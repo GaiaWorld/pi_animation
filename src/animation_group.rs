@@ -1,8 +1,10 @@
+use std::{ops::Deref, hash::Hash};
+
 use pi_curves::{curve::{frame::KeyFrameCurveValue, FramePerSecond}};
 use pi_slotmap::{DefaultKey, Key};
 
 
-use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, amount::AnimationAmountCalc, end_mode::EEndMode, animation::AnimationInfo};
+use crate::{error::EAnimationError, loop_mode::{ELoopMode, get_amount_calc}, target_modifier::{TAnimatableTargetModifier, IDAnimatableAttr}, runtime_info::{RuntimeInfo, RuntimeInfoMap}, target_animation::TargetAnimation, amount::AnimationAmountCalc, base::{EFillMode, TimeMS}, animation::AnimationInfo};
 
 pub type AnimationGroupID = DefaultKey;
 
@@ -28,30 +30,34 @@ pub struct AnimationGroupRuntimeInfo {
 /// * 计算动画进度
 /// * 更新动画进度到内部的各个动画
 /// * 响应动画事件
-pub struct AnimationGroup<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
+pub struct AnimationGroup<T: Clone + PartialEq + Eq + Hash> {
     // animatable_target_id: T,
     id: AnimationGroupID,
     animations: Vec<TargetAnimation<T>>,
     loop_count: Option<u32>,
     /// 动画组速度
     pub speed: KeyFrameCurveValue,
-    pub end_mode: EEndMode,
+    pub fill_mode: EFillMode,
     from: KeyFrameCurveValue,
     to: KeyFrameCurveValue,
+    /// 动画组延迟启动时间
+    delay_time_ms: TimeMS,
+    /// 动画组延迟 启动时间记录
+    running_delay_time_ms: TimeMS,
     /// 动画组有效运行时间
-    delay_time_ms: KeyFrameCurveValue,
+    running_time_ms: TimeMS,
     /// 动画组循环记录
     looped_count: u32,
     /// 动画组循环模式
     loop_mode: ELoopMode,
     /// 累计未运行动画的有效间隔时间
-    detal_ms_record: KeyFrameCurveValue,
+    detal_ms_record: TimeMS,
     /// 动画组运行的帧间隔时长
-    frame_ms: KeyFrameCurveValue,
+    frame_ms: TimeMS,
     /// 动画组使用的动画集合中最大帧数
     max_frame: KeyFrameCurveValue,
     /// 动画组运行一次的时间 - ms
-    once_time_ms: KeyFrameCurveValue,
+    once_time_ms: TimeMS,
     is_playing: bool,
     /// 动画组的混合权重
     pub(crate) blend_weight: f32,
@@ -63,7 +69,7 @@ pub struct AnimationGroup<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
     pub debug: bool,
 }
 
-impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
+impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
     /// 设计每秒帧数据分辨率 - 速度为 1 的情况下
     pub const BASE_FPS: FramePerSecond = 60 as FramePerSecond;
     pub fn new() -> Self {
@@ -76,6 +82,8 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
             from: 0.,
             to: 1.,
             delay_time_ms: 0.,
+            running_delay_time_ms: 0.,
+            running_time_ms: 0.,
             looped_count: 0,
             loop_mode: ELoopMode::Not,
             frame_ms: 16.6,
@@ -85,7 +93,7 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
             is_playing: false,
             blend_weight: 1.0,
             amount_in_second: 0.,
-            end_mode: EEndMode::KeepEnd,
+            fill_mode: EFillMode::NONE,
             amount: get_amount_calc(ELoopMode::Not),
             amount_calc: AnimationAmountCalc::default(),
             debug: false,
@@ -107,23 +115,44 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
     pub fn anime(
         &mut self,
         runtime_infos: &mut RuntimeInfoMap<T>,
-        delta_ms: KeyFrameCurveValue,
+        mut delta_ms: KeyFrameCurveValue,
         group_info: &mut AnimationGroupRuntimeInfo,
     ) {
-        group_info.last_amount_in_second = self.amount_in_second;
+        group_info.last_amount_in_second = group_info.amount_in_second;
 
         if self.is_playing {
-            if self.delay_time_ms.abs() < 0.00001 {
+            // 延时未结束
+            if self.delay_time_ms - self.running_delay_time_ms > self.frame_ms * 0.75 {
+                self.running_delay_time_ms += delta_ms;
+                if (self.fill_mode.deref() & EFillMode::BACKWARDS.deref()) == *EFillMode::BACKWARDS.deref() {
+                    let anime_amount = match self.loop_mode {
+                        ELoopMode::Not => 0.,
+                        ELoopMode::Positive(_) => 0.,
+                        ELoopMode::Opposite(_) => 1.,
+                        ELoopMode::PositivePly(_) => 0.,
+                        ELoopMode::OppositePly(_) => 1.,
+                    };
+                    let amount_in_second = anime_amount * self.once_time_ms / (1000.0 as KeyFrameCurveValue) + self.from / Self::BASE_FPS as KeyFrameCurveValue;
+                    self.amount_in_second = amount_in_second;
+                    group_info.amount_in_second = amount_in_second;
+                    self.update_to_infos(runtime_infos);
+                }
+                return;
+            }
+
+            // 正常运行
+            if self.running_time_ms.abs() < 0.001 {
                 group_info.start_event = true;
             }
 
             self.detal_ms_record += delta_ms;
             log::trace!(">>>>>>>>>>>>>>>> detal_ms_record {}, frame_ms {}", self.detal_ms_record, self.frame_ms);
 
-            if group_info.start_event || self.detal_ms_record >= self.frame_ms || self.debug {
+            // 有效动画帧间隔
+            if group_info.start_event || self.detal_ms_record >= self.frame_ms * 0.75 || self.debug {
                 let amount_call = &self.amount;
     
-                let (mut amount, loop_count) = amount_call(self.once_time_ms + self.frame_ms * 0.5, self.delay_time_ms);
+                let (mut amount, loop_count) = amount_call((self.once_time_ms - self.frame_ms * 0.5).max(self.frame_ms * 0.5), self.running_time_ms);
 
                 if self.looped_count != loop_count {
                     match self.loop_count {
@@ -132,21 +161,14 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
                                 group_info.end_event = true;
                                 self.is_playing = false;
 
-                                amount = match self.end_mode {
-                                    EEndMode::KeepEnd => match self.loop_mode {
+                                if (self.fill_mode.deref() & EFillMode::FORWARDS.deref()) == *EFillMode::FORWARDS.deref() {
+                                    amount = match self.loop_mode {
                                         ELoopMode::Not => 1.,
                                         ELoopMode::Positive(_) => 1.,
                                         ELoopMode::Opposite(_) => 0.,
                                         ELoopMode::PositivePly(_) => 0.,
                                         ELoopMode::OppositePly(_) => 1.,
-                                    },
-                                    EEndMode::BackToStart => match self.loop_mode {
-                                        ELoopMode::Not => 0.,
-                                        ELoopMode::Positive(_) => 0.,
-                                        ELoopMode::Opposite(_) => 1.,
-                                        ELoopMode::PositivePly(_) => 1.,
-                                        ELoopMode::OppositePly(_) => 0.,
-                                    },
+                                    }
                                 }
                             } else {
                                 group_info.loop_event = true;
@@ -161,17 +183,17 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
                 let anime_amount = self.amount_calc.calc(amount);
                 let amount_in_second = anime_amount * self.once_time_ms / (1000.0 as KeyFrameCurveValue) + self.from / Self::BASE_FPS as KeyFrameCurveValue;
     
-                log::trace!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time_ms, self.delay_time_ms, amount, anime_amount, amount_in_second);
+                log::trace!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time_ms, self.running_time_ms, amount, anime_amount, amount_in_second);
     
                 self.looped_count = loop_count;
                 self.amount_in_second = amount_in_second;
-    
+
                 group_info.amount_in_second = amount_in_second;
                 group_info.looped_count = loop_count;
 
                 self.update_to_infos(runtime_infos);
 
-                self.delay_time_ms += self.detal_ms_record * self.speed;
+                self.running_time_ms += self.detal_ms_record * self.speed;
                 self.detal_ms_record = 0.;
             }
         }
@@ -198,11 +220,13 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
         frame_per_second: FramePerSecond,
         amount_calc: AnimationAmountCalc,
         group_info: &mut AnimationGroupRuntimeInfo,
+        delay_time_ms: KeyFrameCurveValue,
+        fillmode: EFillMode,
     ) {
         let speed = 1.0 / seconds;
         let from = 0.;
         let to = self.max_frame as KeyFrameCurveValue;
-        self.start(speed.abs(), loop_mode, from, to, frame_per_second, group_info, amount_calc)
+        self.start(speed.abs(), loop_mode, from, to, frame_per_second, group_info, amount_calc, delay_time_ms, fillmode)
     }
     /// 启动动画组
     /// * `speed` 动画速度 - 正常速度为 1
@@ -220,8 +244,10 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
         frame_per_second: FramePerSecond,
         group_info: &mut AnimationGroupRuntimeInfo,
         amount_calc: AnimationAmountCalc,
+        delay_time_ms: KeyFrameCurveValue,
+        fillmode: EFillMode,
     ) {
-        self.start(speed.abs(), loop_mode, from * self.max_frame, to * self.max_frame, frame_per_second, group_info, amount_calc)
+        self.start(speed.abs(), loop_mode, from * self.max_frame, to * self.max_frame, frame_per_second, group_info, amount_calc, delay_time_ms, fillmode)
     }
     /// 启动动画组
     /// * `speed` 动画速度 - 正常速度为 1
@@ -230,7 +256,7 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
     /// * `to` 指定动画组的结束帧位置
     /// * `frame_per_second` 指定动画组每秒运行多少帧 - 影响动画流畅度和计算性能
     /// * `amount_calc` 播放进度变化控制
-    pub fn start(
+    fn start(
         &mut self,
         speed: KeyFrameCurveValue,
         loop_mode: ELoopMode,
@@ -239,13 +265,22 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
         frame_per_second: FramePerSecond,
         group_info: &mut AnimationGroupRuntimeInfo,
         amount_calc: AnimationAmountCalc,
+        delay_time_ms: KeyFrameCurveValue,
+        fillmode: EFillMode,
     ) {
+        if self.is_playing == true {
+            return;
+        }
+
         self.is_playing = true;
         self.speed = speed.abs();
-        self.delay_time_ms = 0.;
+        self.running_time_ms = 0.;
         self.looped_count = 0;
         self.detal_ms_record = 0.;
         self.amount_in_second = 0.;
+        self.delay_time_ms = delay_time_ms;
+        self.running_delay_time_ms = 0.;
+        self.fill_mode = fillmode;
 
         let (from, to) = (KeyFrameCurveValue::min(from, to), KeyFrameCurveValue::max(from, to));
         // println!("from {}, to {}", from, to);
@@ -282,7 +317,6 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
             },
         }
 
-        group_info.is_playing = true;
         group_info.amount_in_second = self.amount_in_second;
         group_info.last_amount_in_second = self.amount_in_second;
         group_info.start_event = false;
@@ -348,12 +382,12 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroup<T> {
                 // },
                 amount_in_second: self.amount_in_second,
                 // anime: *anime,
-                target: anime.target.clone(),
+                // target: anime.target.clone(),
                 attr: anime.animation.attr(),
                 curve_id: anime.animation.curve_id(),
                 group_weight: self.blend_weight,
             };
-            runtime_infos.insert(anime.animation.ty(), temp);
+            runtime_infos.insert(anime.animation.ty(), anime.target.clone(), temp);
         }
     }
 
@@ -383,7 +417,7 @@ pub enum AnimationGroupAnimatableAttrSet {
 //     }
 // }
 /// 为 AnimationGroup 实现 TAnimatableTargetModifier
-impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> TAnimatableTargetModifier<f32> for AnimationGroup<T> {
+impl<T: Clone + PartialEq + Eq + Hash> TAnimatableTargetModifier<f32> for AnimationGroup<T> {
     fn anime_modify(&mut self, attr: IDAnimatableAttr, value: f32) -> Result<(), EAnimationError> {
         if attr == AnimationGroupAnimatableAttrSet::BlendWeight as IDAnimatableAttr {
             self.blend_weight = value;

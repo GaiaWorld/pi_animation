@@ -1,9 +1,11 @@
+use std::hash::Hash;
+
 use pi_slotmap::{SlotMap, DefaultKey};
 
 use crate::{animation_group::{AnimationGroupID, AnimationGroup}, animation::AnimationInfo};
 
 
-pub trait AnimationGroupManager<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
+pub trait AnimationGroupManager<T: Clone + PartialEq + Eq + Hash> {
 	fn create(&mut self) -> AnimationGroupID;
     // fn create<R: IDAnimatableTargetAllocator>(&mut self, target_allocator: &mut R) -> AnimationGroupID;
     fn del(&mut self, id: AnimationGroupID) -> Vec<AnimationInfo>;
@@ -11,12 +13,12 @@ pub trait AnimationGroupManager<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
     fn get(&self, id: AnimationGroupID) -> Option<&AnimationGroup<T>>;
 }
 
-pub struct AnimationGroupManagerDefault<T: Clone + PartialEq + Eq + PartialOrd + Ord> {
+pub struct AnimationGroupManagerDefault<T: Clone + PartialEq + Eq + Hash> {
     // id_pool: SlotMap<DefaultKey, ()>,
     // counter: AnimationGroupID,
     groups: SlotMap<DefaultKey, AnimationGroup<T>>,
 }
-impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> Default for AnimationGroupManagerDefault<T> {
+impl<T: Clone + PartialEq + Eq + Hash> Default for AnimationGroupManagerDefault<T> {
     fn default() -> Self {
         Self {
             // id_pool: SlotMap::default(),
@@ -26,7 +28,7 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> Default for AnimationGroupMan
     }
 }
 
-impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> AnimationGroupManager<T> for AnimationGroupManagerDefault<T> {
+impl<T: Clone + PartialEq + Eq + Hash> AnimationGroupManager<T> for AnimationGroupManagerDefault<T> {
 	#[inline]
     fn create(
         &mut self,

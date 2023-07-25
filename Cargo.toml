@@ -9,13 +9,11 @@ license = "MIT OR Apache-2.0"
 keywords = ["pi", "animation", "target animation", "attribute animation"]
 
 [dependencies]
-log = "0.4"
-env_logger = "0.9"
-serde = { version = "1.0", features = ["derive"], option=true }
-pi_atom = { version="0.2", features = ["serde"] }
-pi_slotmap = "0.1"
-pi_hash = "0.1"
-pi_share = "0.4"
+log         = "0.4"
+env_logger  = "0.9"
+serde       = { version = "1.0", features = ["derive"], option=true }
+pi_hash     = "0.1"
+pi_slotmap  = "0.1"
 
 pi_curves = { git = "https://github.com/GaiaWorld/pi_curves"}
 

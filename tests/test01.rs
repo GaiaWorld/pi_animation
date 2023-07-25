@@ -157,9 +157,9 @@ impl TypeAnimationContextMgr {
 
         animation_context_amount.anime_curve_calc(delta_ms, &mut self.runtime_infos);
 
-        self.value0_ctx.anime_uncheck(&self.runtime_infos, &mut self.value0_result_pool);
-        self.value1_ctx.anime_uncheck(&self.runtime_infos, &mut self.value1_result_pool);
-        self.f32_ctx.anime_uncheck(&self.runtime_infos, &mut self.f32_result_pool);
+        self.value0_ctx.anime_uncheck(&mut self.runtime_infos, &mut self.value0_result_pool);
+        self.value1_ctx.anime_uncheck(&mut self.runtime_infos, &mut self.value1_result_pool);
+        self.f32_ctx.anime_uncheck(&mut self.runtime_infos, &mut self.f32_result_pool);
     }
 
     /// 动画中间数据清理
@@ -195,7 +195,7 @@ impl<F: FrameDataValue> AsRef<FrameCurve<F>> for AssetCurve<F> {
 mod test01 {
     use std::{sync::Arc, mem::replace};
 
-    use pi_animation::{type_animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc, animation_group_manager::AnimationGroupManagerDefault};
+    use pi_animation::{type_animation_context::{AnimationContextAmount}, target_modifier::{IDAnimatableTargetAllocator, TAnimatableTargetModifier, IDAnimatableAttr, IDAnimatableTarget, TAnimatableTargetId}, loop_mode::ELoopMode, animation_listener::{AnimationListener, EAnimationEventResult}, curve_frame_event::CurveFrameEvent, amount::AnimationAmountCalc, animation_group_manager::AnimationGroupManagerDefault, base::EFillMode};
     use pi_curves::{curve::{frame_curve::FrameCurve, FrameIndex, frame::KeyFrameCurveValue}, easing::EEasingMode, steps::EStepMode};
     use pi_slotmap::{SlotMap, DefaultKey};
     use test::{Bencher};
@@ -204,6 +204,8 @@ mod test01 {
 
     #[test]
     fn test_animatable_float1() {
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
+
         // 创建动画管理器
         let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
         
@@ -214,7 +216,7 @@ mod test01 {
         let mut target = Target0::default(type_animation_ctx_mgr.allocat_target_id());
 
         // 创建动画曲线
-        let frame_count = 60 as FrameIndex;
+        let frame_count = 30 as FrameIndex;
         let key_curve1 = 0;
         let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
         let curve1 = crate::AssetCurve::<f32>(Arc::new(curve1));
@@ -225,17 +227,34 @@ mod test01 {
         // 向动画组添加 动画
         animation_context_amount.add_target_animation_notype(animation0, group0, target.anime_target_id());
         // 启动动画组
-        animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
+        animation_context_amount.start_with_progress(group0, 1.0, ELoopMode::Not, 0.0, 1., frame_count, AnimationAmountCalc::default(), 100., EFillMode::NONE);
 
         // 动画运行
-        type_animation_ctx_mgr.anime(&mut animation_context_amount, 100);
-
+        type_animation_ctx_mgr.anime(&mut animation_context_amount, 70);
         // 查询动画结果
         let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
         println!("{:?}", results);
         results.iter().for_each(|value| {
             target.anime_modify(value.attr, value.value);
         });
+
+        type_animation_ctx_mgr.anime(&mut animation_context_amount, 51);
+        // 查询动画结果
+        let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
+        println!("{:?}", results);
+        results.iter().for_each(|value| {
+            target.anime_modify(value.attr, value.value);
+        });
+        
+        for i in 0..22 {
+            type_animation_ctx_mgr.anime(&mut animation_context_amount, 50);
+            // 查询动画结果
+            let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
+            println!("{:?}", results);
+            results.iter().for_each(|value| {
+                target.anime_modify(value.attr, value.value);
+            });
+        }
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -271,7 +290,7 @@ mod test01 {
         // 向动画组添加 动画
         animation_context_amount.add_target_animation_notype(animation0, group0, target.anime_target_id());
         // 启动动画组
-        animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::default());
+        animation_context_amount.start_complete(group0, 1.0, ELoopMode::Not, 30, AnimationAmountCalc::default(), 0., EFillMode::BACKWARDS);
 
 
         // 查询动画事件
@@ -348,7 +367,7 @@ mod test01 {
         // 向动画组添加 动画
         animation_context_amount.add_target_animation_notype(animation0, group0, target.anime_target_id());
         // 启动动画组
-        animation_context_amount.start(group0, 1.0, ELoopMode::Not, 0.0, frame_count as KeyFrameCurveValue, 30, AnimationAmountCalc::from_steps(5, EStepMode::JumpNone));
+        animation_context_amount.start_complete(group0, 1.0, ELoopMode::Not, 30, AnimationAmountCalc::from_steps(5, EStepMode::JumpNone), 0., EFillMode::BACKWARDS);
 
         // 查询动画事件
         // 创建帧事件
@@ -451,7 +470,7 @@ mod test01 {
                     // 向动画组添加 动画
                     animation_context_amount.add_target_animation_notype(animation0, group0, target.anime_target_id());
                     // 启动动画组
-                    animation_context_amount.start_complete(group0, -0.5 - (i % 5) as f32 * 0.1, ELoopMode::Not, 60, AnimationAmountCalc::default());
+                    animation_context_amount.start_complete(group0, -0.5 - (i % 5) as f32 * 0.1, ELoopMode::Not, 60, AnimationAmountCalc::default(), 0., EFillMode::BACKWARDS);
                 } 
                 
                 // // 创建动画监听器 - 监听动画组 group0
@@ -568,14 +587,22 @@ mod test01 {
                 };
                 animation_context_amount.add_target_animation_notype(animation, group0, targets.get(j).unwrap().anime_target_id());
             }
-            animation_context_amount.start(group0, 1.0, ELoopMode::Opposite(None), 0.0, frame_count as KeyFrameCurveValue, 60, AnimationAmountCalc::default());
+            animation_context_amount.start_complete(group0, 1.0, ELoopMode::Opposite(None), 60, AnimationAmountCalc::default(), 0., EFillMode::BACKWARDS);
         }
         animation_context_amount.debug(true);
+
+        type_animation_ctx_mgr.anime(&mut animation_context_amount, 1);
+
         // 测试 动画性能 计 10w 个动画计算 & 10_000 个对象的数据修改
         b.iter(move || {
 
             type_animation_ctx_mgr.anime(&mut animation_context_amount, 1);
             // type_animation_ctx_mgr.anime_uncheck(1);
+            
+            // let mut r0 = type_animation_ctx_mgr.value0_ctx.anime(&type_animation_ctx_mgr.runtime_infos, &mut type_animation_ctx_mgr.value0_result_pool);
+            // let r1 = type_animation_ctx_mgr.value1_ctx.anime(&type_animation_ctx_mgr.runtime_infos, &mut type_animation_ctx_mgr.value1_result_pool);
+            // let r2 = type_animation_ctx_mgr.f32_ctx.anime(&type_animation_ctx_mgr.runtime_infos, &mut type_animation_ctx_mgr.f32_result_pool);
+
 
             let mut ii = 0;
             for i in 0..group_animation_range {
@@ -587,6 +614,66 @@ mod test01 {
                     ii += 1;
                 });
             }
+        });
+    }
+    
+    #[bench]
+    fn test_peformance_2(b: &mut Bencher) {
+        let curve_range = 100_000;
+        let animation_range = 100_000;
+        let group_range = 100;
+        let group_animation_range = 100;
+        let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
+        let mut animation_context_amount = AnimationContextAmount::<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>::default(AnimationGroupManagerDefault::default());
+        animation_context_amount.debug(true);
+
+        let frame_count = 60 as FrameIndex;
+        // MinMaxCurve
+        let key_curve0 = 0;
+        let mut curve0 = FrameCurve::curve_minmax_curve(Value0(0.0f32), Value0(1.0f32), 60);
+        FrameCurve::curve_minmax_curve_frame(&mut curve0, 0, 0.0f32, 2.0f32, 2.0f32);
+        FrameCurve::curve_minmax_curve_frame(&mut curve0, (frame_count/2) as FrameIndex, 0.5f32, 0.0f32, 0.0f32);
+        FrameCurve::curve_minmax_curve_frame(&mut curve0, frame_count as FrameIndex, 1.0f32, 2.0f32, 2.0f32);
+        let curve0 = crate::AssetCurve::<Value0>(Arc::new(curve0));
+
+
+        let key_curve1 = 1;
+        let mut curve1 = FrameCurve::curve_easing(Value0(0.0), Value0(1.0), frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
+        let curve1 = crate::AssetCurve::<Value0>(Arc::new(curve1));
+
+
+        let mut targets = vec![];
+        // 添加 10_000 目标对象
+        for i in 0..group_animation_range {
+            let mut target = Target0::default(type_animation_ctx_mgr.allocat_target_id());
+            targets.push(target);
+        }
+
+        // 添加 10 动画组 每组 10000 动画
+        for i in 0..group_range {
+            let group0 = animation_context_amount.create_animation_group();
+            for j in 0..group_animation_range {
+                let animation = if j % 2 == 0 {
+                    // 创建属性动画
+                    type_animation_ctx_mgr.value0_ctx.create_animation(Target0AnimatableAttrSet::V0 as IDAnimatableAttr, curve0.clone())
+                } else {
+                    // 创建属性动画
+                    type_animation_ctx_mgr.value0_ctx.create_animation(Target0AnimatableAttrSet::V0a as IDAnimatableAttr, curve1.clone())
+                };
+                animation_context_amount.add_target_animation_notype(animation, group0, targets.get(j).unwrap().anime_target_id());
+            }
+            animation_context_amount.start_complete(group0, 1.0, ELoopMode::Opposite(None), 60, AnimationAmountCalc::default(), 0., EFillMode::BACKWARDS);
+        }
+        animation_context_amount.debug(true);
+
+        type_animation_ctx_mgr.anime(&mut animation_context_amount, 1);
+
+        // 测试 动画性能 计 10w 个动画计算 & 10_000 个对象的数据修改
+        b.iter(move || {
+            type_animation_ctx_mgr.reset();
+            animation_context_amount.anime_curve_calc(1, &mut type_animation_ctx_mgr.runtime_infos);
+            type_animation_ctx_mgr.value0_ctx.anime_uncheck(&mut type_animation_ctx_mgr.runtime_infos, &mut type_animation_ctx_mgr.value0_result_pool);
+
         });
     }
 }

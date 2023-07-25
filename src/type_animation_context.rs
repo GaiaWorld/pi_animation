@@ -1,4 +1,4 @@
-use std::{marker::PhantomData};
+use std::{marker::PhantomData, hash::Hash};
 
 use pi_curves::curve::{
     frame::{FrameDataValue, KeyFrameCurveValue, KeyFrameDataType},
@@ -26,7 +26,7 @@ use crate::{
     target_modifier::{
         IDAnimatableAttr,
         TAnimatableTargetModifier,
-    },
+    }, base::{EFillMode, TimeMS},
 };
 
 /// 类型动画上下文 - 每种数据类型的动画实现一个
@@ -38,7 +38,7 @@ pub struct TypeAnimationContext<F: FrameDataValue, D: AsRef<FrameCurve<F>>> {
 }
 
 impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
-    pub fn new<T: Clone  + PartialEq + Eq + PartialOrd + Ord>(
+    pub fn new<T: Clone  + PartialEq + Eq + Hash>(
         ty: usize,
         runtime_info_map: &mut RuntimeInfoMap<T>,
     ) -> Self {
@@ -88,29 +88,32 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
 
     }
     /// 使用曲线计算结果 计算属性值
-    pub fn anime<T: Clone + PartialEq + Eq + PartialOrd + Ord, R: TypeAnimationResultPool<F, T>>(
+    pub fn anime<T: Clone + PartialEq + Eq + Hash, R: TypeAnimationResultPool<F, T>>(
         &self,
         runtime_infos: &RuntimeInfoMap<T>,
         result_pool: &mut R,
     ) -> Result<(), Vec<EAnimationError>> {
         let mut errs = vec![];
-        let runtime_infos = runtime_infos.list.get(self.ty).unwrap();
+        let runtime_infos = runtime_infos.get_type_list(self.ty).unwrap();
         // log::trace!("anime, runtime_infos len: {}", runtime_infos.len());
         // println!("anime, runtime_infos len: {}", runtime_infos.len());
-        for info in runtime_infos {
-            if let Some(Some(curve)) = self.curves.get(info.curve_id) {
-                // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
-                let value = curve.as_ref().interple(info.amount_in_second);
-                let result = AnimeResult {
-                    value,
-                    attr: info.attr,
-                    weight: info.group_weight,
-                };
-                match result_pool.record_result(info.target.clone(), info.attr, result) {
-                    Ok(_) => {}
-                    Err(e) => errs.push(e),
+
+        for (target, info) in runtime_infos {
+            info.iter().for_each(|info| {
+                if let Some(Some(curve)) = self.curves.get(info.curve_id) {
+                    // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
+                    let value = curve.as_ref().interple(info.amount_in_second);
+                    let result = AnimeResult {
+                        value,
+                        attr: info.attr,
+                        weight: info.group_weight,
+                    };
+                    match result_pool.record_result(target.clone(), info.attr, result) {
+                        Ok(_) => {}
+                        Err(e) => errs.push(e),
+                    }
                 }
-            }
+            });
         }
 
         if errs.len() > 0 {
@@ -122,22 +125,24 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
     }
 
     /// 使用曲线计算结果 计算属性值
-    pub fn anime_uncheck<T: Clone + PartialEq + Eq + PartialOrd + Ord, R: TypeAnimationResultPool<F, T>>(
+    pub fn anime_uncheck<T: Clone + PartialEq + Eq + Hash, R: TypeAnimationResultPool<F, T>>(
         &self,
-        runtime_infos: &RuntimeInfoMap<T>,
+        runtime_infos: &mut RuntimeInfoMap<T>,
         result_pool: &mut R,
     ) {
-        let runtime_infos = runtime_infos.list.get(self.ty).unwrap();
-        for info in runtime_infos {
-            let curve = self.curves.get(info.curve_id).unwrap().as_ref().unwrap();
-            // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
-            let value = curve.as_ref().interple(info.amount_in_second);
-            let result = AnimeResult {
-                value,
-                attr: info.attr,
-                weight: info.group_weight,
-            };
-            result_pool.record_result(info.target.clone(), info.attr, result);
+        let mut runtime_infos = runtime_infos.get_type_list(self.ty).unwrap();
+        for (target, info) in runtime_infos {
+            info.iter().for_each(|info| {
+                let curve = self.curves.get(info.curve_id).unwrap().as_ref().unwrap();
+                // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
+                let value = curve.as_ref().interple(info.amount_in_second);
+                let result = AnimeResult {
+                    value,
+                    attr: info.attr,
+                    weight: info.group_weight,
+                };
+                result_pool.record_result(target.clone(), info.attr, result);
+            });
         }
     }
 
@@ -184,7 +189,7 @@ pub trait AnimationContextMgr {
 /// * 自身也是可动画的目标
 ///   * 可动画的属性为
 ///     * time_scale
-pub struct AnimationContextAmount<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> {
+pub struct AnimationContextAmount<T: Clone + PartialEq + Eq + Hash, M: AnimationGroupManager<T>> {
     pub group_mgr: M,
     // pub group_infos: Vec<AnimationGroupRuntimeInfo>,
     pub group_infos: SecondaryMap<DefaultKey, AnimationGroupRuntimeInfo>,
@@ -194,7 +199,7 @@ pub struct AnimationContextAmount<T: Clone + PartialEq + Eq + PartialOrd + Ord, 
     mark: PhantomData<T>,
 }
 
-impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
+impl<T: Clone + PartialEq + Eq + Hash, M: AnimationGroupManager<T>> AnimationContextAmount<T, M> {
     pub fn default(group_mgr: M) -> Self {
         Self {
             group_mgr,
@@ -365,6 +370,8 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> 
         loop_mode: ELoopMode,
         frame_per_second: FramePerSecond,
         amount_calc: AnimationAmountCalc,
+        delay_time_ms: KeyFrameCurveValue,
+        fillmode: EFillMode,
     ) -> Result<(), EAnimationError> {
         match self.group_infos.get_mut(id) {
             Some(group_info) => match group_info.is_playing {
@@ -377,6 +384,8 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> 
                         frame_per_second,
                         amount_calc,
                         group_info,
+                        delay_time_ms,
+                        fillmode,
                     );
                     Ok(())
                 }
@@ -400,6 +409,8 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> 
         to: KeyFrameCurveValue,
         frame_per_second: FramePerSecond,
         amount_calc: AnimationAmountCalc,
+        delay_time_ms: TimeMS,
+        fillmode: EFillMode,
     ) -> Result<(), EAnimationError> {
         match self.group_infos.get_mut(id) {
             Some(group_info) => match group_info.is_playing {
@@ -414,6 +425,8 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> 
                         frame_per_second,
                         group_info,
                         amount_calc,
+                        delay_time_ms,
+                        fillmode,
                     );
                     Ok(())
                 }
@@ -421,43 +434,47 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> 
             None => Err(EAnimationError::AnimationGroupNotFound),
         }
     }
-    /// 启动动画组
-    /// * `speed` 动画速度 - 正常速度为 1
-    /// * `loop_mode` 循环模式
-    /// * `from` 指定动画组的起始帧位置
-    /// * `to` 指定动画组的结束帧位置
-    /// * `frame_per_second` 指定动画组每秒运行多少帧 - 影响动画流畅度和计算性能
-    /// * `amount_calc` 播放进度变化控制
-    pub fn start(
-        &mut self,
-        id: AnimationGroupID,
-        speed: KeyFrameCurveValue,
-        loop_mode: ELoopMode,
-        from: KeyFrameCurveValue,
-        to: KeyFrameCurveValue,
-        frame_per_second: FramePerSecond,
-        amount_calc: AnimationAmountCalc,
-    ) -> Result<(), EAnimationError> {
-        match self.group_infos.get_mut(id) {
-            Some(group_info) => match group_info.is_playing {
-                true => Err(EAnimationError::AnimationGroupHasStarted),
-                false => {
-                    group_info.is_playing = true;
-                    self.group_mgr.get_mut(id).unwrap().start(
-                        speed,
-                        loop_mode,
-                        from,
-                        to,
-                        frame_per_second,
-                        group_info,
-                        amount_calc,
-                    );
-                    Ok(())
-                }
-            },
-            None => Err(EAnimationError::AnimationGroupNotFound),
-        }
-    }
+    // /// 启动动画组
+    // /// * `speed` 动画速度 - 正常速度为 1
+    // /// * `loop_mode` 循环模式
+    // /// * `from` 指定动画组的起始帧位置
+    // /// * `to` 指定动画组的结束帧位置
+    // /// * `frame_per_second` 指定动画组每秒运行多少帧 - 影响动画流畅度和计算性能
+    // /// * `amount_calc` 播放进度变化控制
+    // pub fn start(
+    //     &mut self,
+    //     id: AnimationGroupID,
+    //     speed: KeyFrameCurveValue,
+    //     loop_mode: ELoopMode,
+    //     from: KeyFrameCurveValue,
+    //     to: KeyFrameCurveValue,
+    //     frame_per_second: FramePerSecond,
+    //     amount_calc: AnimationAmountCalc,
+    //     delay_time_ms: KeyFrameCurveValue,
+    //     fillmode: EFillMode,
+    // ) -> Result<(), EAnimationError> {
+    //     match self.group_infos.get_mut(id) {
+    //         Some(group_info) => match group_info.is_playing {
+    //             true => Err(EAnimationError::AnimationGroupHasStarted),
+    //             false => {
+    //                 group_info.is_playing = true;
+    //                 self.group_mgr.get_mut(id).unwrap().start(
+    //                     speed,
+    //                     loop_mode,
+    //                     from,
+    //                     to,
+    //                     frame_per_second,
+    //                     group_info,
+    //                     amount_calc,
+    //                     delay_time_ms,
+    //                     fillmode,
+    //                 );
+    //                 Ok(())
+    //             }
+    //         },
+    //         None => Err(EAnimationError::AnimationGroupNotFound),
+    //     }
+    // }
 
     /// 暂停动画组
     pub fn pause(&mut self, id: AnimationGroupID) -> Result<(), EAnimationError> {
@@ -465,12 +482,6 @@ impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> 
             Some(group_info) => match group_info.is_playing {
                 true => {
                     group_info.is_playing = false;
-                    group_info.amount_in_second = 0.;
-                    group_info.last_amount_in_second = 0.;
-                    group_info.looped_count = 0;
-                    group_info.start_event = false;
-                    group_info.end_event = false;
-                    group_info.loop_event = false;
                     Ok(())
                 }
                 false => Err(EAnimationError::AnimationGroupNotPlaying),
@@ -596,7 +607,7 @@ pub enum AnimationContextAmountAnimatableAttrSet {
 //     }
 // }
 /// 为 AnimationContextAmount 实现 TAnimatableTargetModifier
-impl<T: Clone + PartialEq + Eq + PartialOrd + Ord, M: AnimationGroupManager<T>> TAnimatableTargetModifier<f32>
+impl<T: Clone + PartialEq + Eq + Hash, M: AnimationGroupManager<T>> TAnimatableTargetModifier<f32>
     for AnimationContextAmount<T, M>
 {
     fn anime_modify(&mut self, attr: IDAnimatableAttr, value: f32) -> Result<(), EAnimationError> {
