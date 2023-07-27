@@ -257,6 +257,64 @@ mod test01 {
         }
     }
 
+    #[test]
+    fn test_force_totalframes() {
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
+
+        // 创建动画管理器
+        let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
+        
+        let mut animation_context_amount = AnimationContextAmount::<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>::default(AnimationGroupManagerDefault::default());
+        animation_context_amount.debug(true);
+
+        // 创建一个动画要作用的目标对象
+        let mut target = Target0::default(type_animation_ctx_mgr.allocat_target_id());
+
+        // 创建动画曲线
+        let frame_count = 30 as FrameIndex;
+        let key_curve1 = 0;
+        let mut curve1 = FrameCurve::curve_easing(0.0f32, 100.0f32, frame_count as FrameIndex, frame_count, pi_curves::easing::EEasingMode::None);
+        let curve1 = crate::AssetCurve::<f32>(Arc::new(curve1));
+        let animation0 = type_animation_ctx_mgr.f32_ctx.create_animation(Target0AnimatableAttrSet::V2 as IDAnimatableAttr, curve1);
+
+        // 创建动画组
+        let group0 = animation_context_amount.create_animation_group();
+        // 向动画组添加 动画
+        animation_context_amount.add_target_animation_notype(animation0, group0, target.anime_target_id());
+        
+        // 
+        animation_context_amount.force_group_total_frames(group0, Some(50.), 30);
+        // 启动动画组
+        animation_context_amount.start_complete(group0, 1.0, ELoopMode::Not, frame_count, AnimationAmountCalc::default(), 100., EFillMode::NONE);
+
+        // 动画运行
+        type_animation_ctx_mgr.anime(&mut animation_context_amount, 70);
+        // 查询动画结果
+        let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
+        println!("{:?}", results);
+        results.iter().for_each(|value| {
+            target.anime_modify(value.attr, value.value);
+        });
+
+        type_animation_ctx_mgr.anime(&mut animation_context_amount, 51);
+        // 查询动画结果
+        let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
+        println!("{:?}", results);
+        results.iter().for_each(|value| {
+            target.anime_modify(value.attr, value.value);
+        });
+        
+        for i in 0..30 {
+            type_animation_ctx_mgr.anime(&mut animation_context_amount, 50);
+            // 查询动画结果
+            let results = type_animation_ctx_mgr.f32_result_pool.query_result(target.anime_target_id());
+            println!("{:?}", results);
+            results.iter().for_each(|value| {
+                target.anime_modify(value.attr, value.value);
+            });
+        }
+    }
+
     #[derive(Debug, Clone, Copy)]
     pub enum TestFrameEventData {
         Test0,

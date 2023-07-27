@@ -56,6 +56,8 @@ pub struct AnimationGroup<T: Clone + PartialEq + Eq + Hash> {
     frame_ms: TimeMS,
     /// 动画组使用的动画集合中最大帧数
     max_frame: KeyFrameCurveValue,
+    /// 强制指定的动画组运行帧数 而不是动画集合中最大帧数
+    force_max_frame: Option<KeyFrameCurveValue>,
     /// 动画组运行一次的时间 - ms
     once_time_ms: TimeMS,
     is_playing: bool,
@@ -92,6 +94,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
             frame_ms: 16.6,
             detal_ms_record: 0.,
             max_frame: 0.,
+            force_max_frame: None,
             once_time_ms: 1.,
             is_playing: false,
             blend_weight: 1.0,
@@ -109,9 +112,29 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
         self.amount_calc = amount_calc;
     }
 
-    /// 获取动画组整体的最大帧位置 - 可 用于 start 接口 from to 参数的参考
+    /// 动画组运行总帧数 - 可 用于 start 接口 from to 参数的参考
     pub fn max_frame(&self) -> KeyFrameCurveValue {
-        self.max_frame
+        if let Some(force_max_frame) = self.force_max_frame {
+            force_max_frame
+        } else {
+            self.max_frame
+        }
+    }
+
+    /// 强制指定动画组运行总帧数, 未指定则内部会使用动画曲线集合中最大帧数
+    /// * 赋值 start_complete 和 start_with_progeress
+    /// * 需要在启动动画前修改
+    pub fn force_total_frame(&mut self, design_frame_per_second: FramePerSecond, frames: Option<KeyFrameCurveValue>) {
+        if design_frame_per_second == 0 {
+            self.force_max_frame = None;
+            return;
+        }
+        if let Some(mut frames) = frames {
+            frames = Self::BASE_FPS as KeyFrameCurveValue * (frames / design_frame_per_second as KeyFrameCurveValue);
+            self.force_max_frame = Some(frames);
+        } else {
+            self.force_max_frame = None;
+        }
     }
 
 	/// 设置id
@@ -124,7 +147,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
     pub fn anime(
         &mut self,
         runtime_infos: &mut RuntimeInfoMap<T>,
-        mut delta_ms: KeyFrameCurveValue,
+        delta_ms: KeyFrameCurveValue,
         group_info: &mut AnimationGroupRuntimeInfo,
     ) {
         group_info.last_amount_in_second = group_info.amount_in_second;
@@ -234,7 +257,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
     ) {
         let speed = 1.0 / seconds;
         let from = 0.;
-        let to = self.max_frame as KeyFrameCurveValue;
+        let to = self.max_frame();
         self.start(speed.abs(), loop_mode, from, to, frame_per_second, group_info, amount_calc_between_frame, delay_time_ms, fillmode)
     }
     /// 启动动画组
@@ -256,7 +279,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
         delay_time_ms: KeyFrameCurveValue,
         fillmode: EFillMode,
     ) {
-        self.start(speed.abs(), loop_mode, from * self.max_frame, to * self.max_frame, frame_per_second, group_info, amount_calc_between_frame, delay_time_ms, fillmode)
+        self.start(speed.abs(), loop_mode, from * self.max_frame(), to * self.max_frame(), frame_per_second, group_info, amount_calc_between_frame, delay_time_ms, fillmode)
     }
     /// 启动动画组
     /// * `speed` 动画速度 - 正常速度为 1
@@ -346,6 +369,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
         self.loop_mode = mode;
         self.amount = get_amount_calc(mode);
     }
+    /// 动画组执行一轮需要的时间 从 from 到 to
     fn once_time(
         &mut self,
     ) {
@@ -356,13 +380,13 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
         &mut self,
         from: KeyFrameCurveValue,
     ) {
-        self.from = KeyFrameCurveValue::max(0., from as KeyFrameCurveValue);
+        self.from = from;
     }
     fn to(
         &mut self,
         to: KeyFrameCurveValue,
     ) {
-        self.to = KeyFrameCurveValue::min(self.max_frame as KeyFrameCurveValue, to);
+        self.to = to;
     }
 
     fn frame_per_second(

@@ -359,6 +359,22 @@ impl<T: Clone + PartialEq + Eq + Hash, M: AnimationGroupManager<T>> AnimationCon
             None => Err(EAnimationError::AnimationGroupNotFound),
         }
     }
+    /// 显式指定动画组总帧数
+    /// * `total_frames` 动画组总帧数 指定 None 则自动使用内部动画曲线中最大帧数
+    pub fn force_group_total_frames(
+        &mut self,
+        id: AnimationGroupID,
+        total_frames: Option<KeyFrameCurveValue>,
+        design_frame_per_second: FramePerSecond,
+    ) -> Result<(), EAnimationError> {
+        match self.group_mgr.get_mut(id) {
+            Some(group) => {
+                group.force_total_frame(design_frame_per_second, total_frames);
+                Ok(())
+            },
+            None => Err(EAnimationError::AnimationGroupNotFound),
+        }
+    }
     /// 启动动画组 - 完整播放,不关心动画到底设计了多少帧
     /// * `seconds` 播放时长 - 秒
     /// * `loop_mode` 循环模式
