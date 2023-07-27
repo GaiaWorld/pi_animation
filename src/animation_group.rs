@@ -189,7 +189,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
                     }
                 }
     
-                let anime_amount = self.amount_calc_between_frame.calc(amount);
+                let anime_amount = self.amount_calc.calc(amount);
                 let amount_in_second = anime_amount * self.once_time_ms / (1000.0 as KeyFrameCurveValue) + self.from / Self::BASE_FPS as KeyFrameCurveValue;
     
                 log::trace!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time_ms, self.running_time_ms, amount, anime_amount, amount_in_second);
