@@ -102,7 +102,7 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
             info.iter().for_each(|info| {
                 if let Some(Some(curve)) = self.curves.get(info.curve_id) {
                     // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
-                    let value = curve.as_ref().interple(info.amount_in_second);
+                    let value = curve.as_ref().interple(info.amount_in_second, &info.amount_calc);
                     let result = AnimeResult {
                         value,
                         attr: info.attr,
@@ -135,7 +135,7 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
             info.iter().for_each(|info| {
                 let curve = self.curves.get(info.curve_id).unwrap().as_ref().unwrap();
                 // println!(">>>>>>>>>>>>>>>>>{}", info.amount_in_second);
-                let value = curve.as_ref().interple(info.amount_in_second);
+                let value = curve.as_ref().interple(info.amount_in_second, &info.amount_calc);
                 let result = AnimeResult {
                     value,
                     attr: info.attr,

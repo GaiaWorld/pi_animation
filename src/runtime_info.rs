@@ -1,6 +1,6 @@
-use std::{mem::replace, hash::Hash};
+use std::{mem::replace, hash::Hash, sync::Arc};
 
-use pi_curves::curve::frame::{KeyFrameCurveValue, KeyFrameDataType};
+use pi_curves::{curve::frame::{KeyFrameCurveValue, KeyFrameDataType}, amount::AnimationAmountCalc};
 use pi_hash::XHashMap;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// 一个动画的运行时数据
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone)]
 pub struct RuntimeInfo {
     // pub group_info: AnimationGroupRuntimeInfo,
     /// 所属动画组的权重
@@ -21,6 +21,7 @@ pub struct RuntimeInfo {
     pub attr: IDAnimatableAttr,
     /// 在曲线对应的数据类型 曲线信息管理器中 该动画使用的曲线 的 ID
     pub curve_id: FrameCurveInfoID,
+    pub amount_calc: Arc<AnimationAmountCalc>,
     // pub anime: TargetAnimation,
 }
 // impl<T: Clone + PartialEq + Eq + PartialOrd + Ord> PartialEq for RuntimeInfo<T> {

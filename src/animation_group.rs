@@ -1,4 +1,4 @@
-use std::{ops::Deref, hash::Hash};
+use std::{ops::Deref, hash::Hash, sync::Arc};
 
 use pi_curves::{curve::{frame::KeyFrameCurveValue, FramePerSecond}};
 use pi_slotmap::{DefaultKey, Key};
@@ -64,7 +64,10 @@ pub struct AnimationGroup<T: Clone + PartialEq + Eq + Hash> {
     /// 动画组的在秒单位下的进度
     amount_in_second: KeyFrameCurveValue,
     amount: fn(KeyFrameCurveValue, KeyFrameCurveValue) -> (KeyFrameCurveValue, u32),
+    /// 动画组整体 进度曲线
     amount_calc: AnimationAmountCalc,
+    /// 关键帧之间 进度曲线
+    amount_calc_between_frame: Arc<AnimationAmountCalc>,
     /// 是否为测试模式
     pub debug: bool,
 }
@@ -96,8 +99,14 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
             fill_mode: EFillMode::NONE,
             amount: get_amount_calc(ELoopMode::Not),
             amount_calc: AnimationAmountCalc::default(),
+            amount_calc_between_frame: Arc::new(AnimationAmountCalc::default()),
             debug: false,
         }
+    }
+
+    /// 动画组运行过程的时间曲线
+    pub fn amount_calc(&mut self, amount_calc: AnimationAmountCalc) {
+        self.amount_calc = amount_calc;
     }
 
     /// 获取动画组整体的最大帧位置 - 可 用于 start 接口 from to 参数的参考
@@ -180,7 +189,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
                     }
                 }
     
-                let anime_amount = self.amount_calc.calc(amount);
+                let anime_amount = self.amount_calc_between_frame.calc(amount);
                 let amount_in_second = anime_amount * self.once_time_ms / (1000.0 as KeyFrameCurveValue) + self.from / Self::BASE_FPS as KeyFrameCurveValue;
     
                 log::trace!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time_ms, self.running_time_ms, amount, anime_amount, amount_in_second);
@@ -212,13 +221,13 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
     /// 启动动画组 - 完整播放,不关心动画到底设计了多少帧
     /// * `seconds` 播放时长 - 秒
     /// * `loop_mode` 循环模式
-    /// * `amount_calc` 播放进度变化控制
+    /// * `amount_calc_between_frame` 关键帧之间 进度曲线
     pub fn start_complete(
         &mut self,
         seconds: KeyFrameCurveValue,
         loop_mode: ELoopMode,
         frame_per_second: FramePerSecond,
-        amount_calc: AnimationAmountCalc,
+        amount_calc_between_frame: AnimationAmountCalc,
         group_info: &mut AnimationGroupRuntimeInfo,
         delay_time_ms: KeyFrameCurveValue,
         fillmode: EFillMode,
@@ -226,7 +235,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
         let speed = 1.0 / seconds;
         let from = 0.;
         let to = self.max_frame as KeyFrameCurveValue;
-        self.start(speed.abs(), loop_mode, from, to, frame_per_second, group_info, amount_calc, delay_time_ms, fillmode)
+        self.start(speed.abs(), loop_mode, from, to, frame_per_second, group_info, amount_calc_between_frame, delay_time_ms, fillmode)
     }
     /// 启动动画组
     /// * `speed` 动画速度 - 正常速度为 1
@@ -234,7 +243,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
     /// * `from` 指定动画组的起始帧百分比位置 - 0~1
     /// * `to` 指定动画组的结束帧百分比位置 - 0~1
     /// * `frame_per_second` 指定动画组每秒运行多少帧 - 影响动画流畅度和计算性能
-    /// * `amount_calc` 播放进度变化控制
+    /// * `amount_calc_between_frame` 关键帧之间 进度曲线
     pub fn start_with_progress(
         &mut self,
         speed: KeyFrameCurveValue,
@@ -243,11 +252,11 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
         to: KeyFrameCurveValue,
         frame_per_second: FramePerSecond,
         group_info: &mut AnimationGroupRuntimeInfo,
-        amount_calc: AnimationAmountCalc,
+        amount_calc_between_frame: AnimationAmountCalc,
         delay_time_ms: KeyFrameCurveValue,
         fillmode: EFillMode,
     ) {
-        self.start(speed.abs(), loop_mode, from * self.max_frame, to * self.max_frame, frame_per_second, group_info, amount_calc, delay_time_ms, fillmode)
+        self.start(speed.abs(), loop_mode, from * self.max_frame, to * self.max_frame, frame_per_second, group_info, amount_calc_between_frame, delay_time_ms, fillmode)
     }
     /// 启动动画组
     /// * `speed` 动画速度 - 正常速度为 1
@@ -255,7 +264,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
     /// * `from` 指定动画组的起始帧位置
     /// * `to` 指定动画组的结束帧位置
     /// * `frame_per_second` 指定动画组每秒运行多少帧 - 影响动画流畅度和计算性能
-    /// * `amount_calc` 播放进度变化控制
+    /// * `amount_calc_between_frame` 关键帧之间 进度曲线
     fn start(
         &mut self,
         speed: KeyFrameCurveValue,
@@ -264,7 +273,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
         to: KeyFrameCurveValue,
         frame_per_second: FramePerSecond,
         group_info: &mut AnimationGroupRuntimeInfo,
-        amount_calc: AnimationAmountCalc,
+        amount_calc_between_frame: AnimationAmountCalc,
         delay_time_ms: KeyFrameCurveValue,
         fillmode: EFillMode,
     ) {
@@ -292,7 +301,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
 
         self.once_time();
 
-        self.amount_calc = amount_calc;
+        self.amount_calc_between_frame = Arc::new(amount_calc_between_frame);
 
         match loop_mode {
             ELoopMode::Opposite(v) => {
@@ -386,6 +395,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
                 attr: anime.animation.attr(),
                 curve_id: anime.animation.curve_id(),
                 group_weight: self.blend_weight,
+                amount_calc: self.amount_calc_between_frame.clone()
             };
             runtime_infos.insert(anime.animation.ty(), anime.target.clone(), temp);
         }

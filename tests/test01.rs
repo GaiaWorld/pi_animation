@@ -622,7 +622,7 @@ mod test01 {
         let curve_range = 100_000;
         let animation_range = 100_000;
         let group_range = 100;
-        let group_animation_range = 100;
+        let group_animation_range = 1000;
         let mut type_animation_ctx_mgr = TypeAnimationContextMgr::default();
         let mut animation_context_amount = AnimationContextAmount::<DefaultKey, AnimationGroupManagerDefault<DefaultKey>>::default(AnimationGroupManagerDefault::default());
         animation_context_amount.debug(true);
