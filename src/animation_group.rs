@@ -317,7 +317,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
         let (from, to) = (KeyFrameCurveValue::min(from, to), KeyFrameCurveValue::max(from, to));
         // println!("from {}, to {}", from, to);
 
-        self.frame_per_second(frame_per_second);
+        let _ = self.frame_per_second(frame_per_second);
         self.loop_mode(loop_mode);
         self.from(from);
         self.to(to);
@@ -421,7 +421,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
                 group_weight: self.blend_weight,
                 amount_calc: self.amount_calc_between_frame.clone()
             };
-            runtime_infos.insert(anime.animation.ty(), anime.target.clone(), temp);
+            let _ = runtime_infos.insert(anime.animation.ty(), anime.target.clone(), temp);
         }
     }
 

@@ -1,6 +1,6 @@
 [package]
 name = "pi_animation"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["baip0002 <bai9253461@gmail.com>"]
 edition = "2021"
 description = "Animation Runtime Library"
@@ -15,7 +15,7 @@ serde       = { version = "1.0", features = ["derive"], option=true }
 pi_hash     = "0.1"
 pi_slotmap  = "0.1"
 
-pi_curves = { git = "https://github.com/GaiaWorld/pi_curves"}
+pi_curves = { version = "0.1.0", registry = "yn"}
 
-[patch."https://github.com/GaiaWorld/pi_curves"]
+[patch.yn]
 pi_curves = { path = "../pi_curves"}

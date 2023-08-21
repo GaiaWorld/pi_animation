@@ -1,4 +1,4 @@
-use pi_curves::curve::{FrameIndex, FramePerSecond, frame::KeyFrameCurveValue};
+use pi_curves::curve::{FrameIndex, frame::KeyFrameCurveValue};
 
 pub type FrameEventData = u16;
 

@@ -1,4 +1,4 @@
-use std::{mem::replace, hash::Hash, sync::Arc};
+use std::{hash::Hash, sync::Arc};
 
 use pi_curves::{curve::frame::{KeyFrameCurveValue, KeyFrameDataType}, amount::AnimationAmountCalc};
 use pi_hash::XHashMap;
@@ -6,7 +6,7 @@ use pi_hash::XHashMap;
 use crate::{
     error::EAnimationError,
     frame_curve_manager::FrameCurveInfoID,
-    target_modifier::{IDAnimatableAttr},
+    target_modifier::IDAnimatableAttr,
 };
 
 /// 一个动画的运行时数据

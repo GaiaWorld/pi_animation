@@ -130,7 +130,7 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
         runtime_infos: &mut RuntimeInfoMap<T>,
         result_pool: &mut R,
     ) {
-        let mut runtime_infos = runtime_infos.get_type_list(self.ty).unwrap();
+        let runtime_infos = runtime_infos.get_type_list(self.ty).unwrap();
         for (target, info) in runtime_infos {
             info.iter().for_each(|info| {
                 let curve = self.curves.get(info.curve_id).unwrap().as_ref().unwrap();
@@ -141,7 +141,7 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
                     attr: info.attr,
                     weight: info.group_weight,
                 };
-                result_pool.record_result(target.clone(), info.attr, result);
+                let _ = result_pool.record_result(target.clone(), info.attr, result);
             });
         }
     }
