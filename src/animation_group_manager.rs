@@ -16,7 +16,7 @@ pub trait AnimationGroupManager<T: Clone + PartialEq + Eq + Hash> {
 pub struct AnimationGroupManagerDefault<T: Clone + PartialEq + Eq + Hash> {
     // id_pool: SlotMap<DefaultKey, ()>,
     // counter: AnimationGroupID,
-    groups: SlotMap<DefaultKey, AnimationGroup<T>>,
+    pub groups: SlotMap<DefaultKey, AnimationGroup<T>>,
 }
 impl<T: Clone + PartialEq + Eq + Hash> Default for AnimationGroupManagerDefault<T> {
     fn default() -> Self {
