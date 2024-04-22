@@ -10,18 +10,16 @@ use pi_slotmap::{DefaultKey, SecondaryMap};
 
 use crate::{
     amount::AnimationAmountCalc,
-    animation::{AnimationInfo},
+    animation::AnimationInfo,
     animation_group::{AnimationGroupID, AnimationGroupRuntimeInfo, AnimationGroup},
     animation_group_manager::AnimationGroupManager,
     animation_listener::{AnimationListener, EAnimationEvent},
     animation_result_pool::{TypeAnimationResultPool, AnimeResult},
     curve_frame_event::CurveFrameEvent,
     error::EAnimationError,
-    frame_curve_manager::{
-        FrameCurveInfo,
-    },
+    frame_curve_manager::FrameCurveInfo,
     loop_mode::ELoopMode,
-    runtime_info::{RuntimeInfoMap},
+    runtime_info::RuntimeInfoMap,
     target_animation::TargetAnimation,
     target_modifier::{
         IDAnimatableAttr,
@@ -60,31 +58,40 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
         curve: D,
     ) -> AnimationInfo {
         let curve_info = FrameCurveInfo::from(curve.as_ref());
-        
-        if let Some(index) = self.id_pool.pop() {
-            let result = AnimationInfo {
-                attr,
-                ty: self.ty,
-                curve_info,
-                curve_id: index,
-            };
 
-            self.curves[index] = Some(curve);
+        // if let Some(index) = self.id_pool.pop() {
+        //     let result = AnimationInfo {
+        //         attr,
+        //         ty: self.ty,
+        //         curve_info,
+        //         curve_id: index,
+        //     };
+
+        //     self.curves[index] = Some(curve);
             
-            result
+        //     result
+        // } else {
+        //     let index = self.curves.len();
+        //     let result = AnimationInfo {
+        //         attr,
+        //         ty: self.ty,
+        //         curve_info,
+        //         curve_id: index,
+        //     };
+
+        //     self.curves.push(Some(curve));
+
+        //     result
+        // }
+        
+        let (result, index) = _create_animation(self.ty, &mut self.id_pool, curve_info, attr, self.curves.len());
+        
+        if index == self.curves.len() {
+            self.curves[index] = Some(curve);
         } else {
-            let index = self.curves.len();
-            let result = AnimationInfo {
-                attr,
-                ty: self.ty,
-                curve_info,
-                curve_id: index,
-            };
-
             self.curves.push(Some(curve));
-
-            result
         }
+        result
 
     }
     /// 使用曲线计算结果 计算属性值
@@ -631,5 +638,38 @@ impl<T: Clone + PartialEq + Eq + Hash, M: AnimationGroupManager<T>> TAnimatableT
             self.time_scale = value;
         }
         Ok(())
+    }
+}
+
+
+/// 添加 动画曲线数据
+fn _create_animation(
+    ty: usize,
+    id_pool: &mut Vec<usize>,
+    curve_info: FrameCurveInfo,
+    attr: IDAnimatableAttr,
+    len: usize,
+) -> (AnimationInfo, usize) {
+    if let Some(index) = id_pool.pop() {
+        let result = AnimationInfo {
+            attr,
+            ty,
+            curve_info,
+            curve_id: index,
+        };
+
+        // self.curves[index] = Some(curve);
+        (result, index)
+    } else {
+        let index = len;
+        let result = AnimationInfo {
+            attr,
+            ty,
+            curve_info,
+            curve_id: index,
+        };
+
+        // self.curves.push(Some(curve));
+        (result, len)
     }
 }

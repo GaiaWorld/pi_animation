@@ -75,9 +75,12 @@ pub struct AnimationGroup<T: Clone + PartialEq + Eq + Hash> {
     pub debug: bool,
 }
 
+/// 设计每秒帧数据分辨率 - 速度为 1 的情况下
+pub const BASE_FPS: FramePerSecond = 60 as FramePerSecond;
+
 impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
     /// 设计每秒帧数据分辨率 - 速度为 1 的情况下
-    pub const BASE_FPS: FramePerSecond = 60 as FramePerSecond;
+    pub const BASE_FPS: FramePerSecond = BASE_FPS;
     pub fn new() -> Self {
         Self {
             // animatable_target_id,
@@ -154,81 +157,103 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
         group_info.last_amount_in_second = group_info.amount_in_second;
 
         if self.is_playing {
-            // 延时未结束
-            if self.delay_time_ms - self.running_delay_time_ms > self.frame_ms * 0.75 {
-                self.running_delay_time_ms += delta_ms;
-                if (self.fill_mode.deref() & EFillMode::BACKWARDS.deref()) == *EFillMode::BACKWARDS.deref() {
-                    let anime_amount = match self.loop_mode {
-                        ELoopMode::Not => 0.,
-                        ELoopMode::Positive(_) => 0.,
-                        ELoopMode::Opposite(_) => 1.,
-                        ELoopMode::PositivePly(_) => 0.,
-                        ELoopMode::OppositePly(_) => 1.,
-                    };
-                    let amount_in_second = anime_amount * self.once_time_ms / (1000.0 as KeyFrameCurveValue) + self.from / Self::BASE_FPS as KeyFrameCurveValue;
-                    self.amount_in_second = amount_in_second;
-                    group_info.amount_in_second = amount_in_second;
-                    self.update_to_infos(runtime_infos);
-                }
-                return;
-            }
+            // // 延时未结束
+            // if self.delay_time_ms - self.running_delay_time_ms > self.frame_ms * 0.75 {
+            //     self.running_delay_time_ms += delta_ms;
+            //     if (self.fill_mode.deref() & EFillMode::BACKWARDS.deref()) == *EFillMode::BACKWARDS.deref() {
+            //         let anime_amount = match self.loop_mode {
+            //             ELoopMode::Not => 0.,
+            //             ELoopMode::Positive(_) => 0.,
+            //             ELoopMode::Opposite(_) => 1.,
+            //             ELoopMode::PositivePly(_) => 0.,
+            //             ELoopMode::OppositePly(_) => 1.,
+            //         };
+            //         let amount_in_second = anime_amount * self.once_time_ms / (1000.0 as KeyFrameCurveValue) + self.from / Self::BASE_FPS as KeyFrameCurveValue;
+            //         self.amount_in_second = amount_in_second;
+            //         group_info.amount_in_second = amount_in_second;
+            //         self.update_to_infos(runtime_infos);
+            //     }
+            //     return;
+            // }
 
-            // 正常运行
-            if self.running_time_ms.abs() < 0.001 {
-                group_info.start_event = true;
-            }
+            // // 正常运行
+            // if self.running_time_ms.abs() < 0.001 {
+            //     group_info.start_event = true;
+            // }
 
-            self.detal_ms_record += delta_ms;
-            log::trace!(">>>>>>>>>>>>>>>> detal_ms_record {}, frame_ms {}", self.detal_ms_record, self.frame_ms);
+            // self.detal_ms_record += delta_ms;
+            // log::trace!(">>>>>>>>>>>>>>>> detal_ms_record {}, frame_ms {}", self.detal_ms_record, self.frame_ms);
 
-            // 有效动画帧间隔
-            if group_info.start_event || self.detal_ms_record >= self.frame_ms * 0.75 || self.debug {
-                let amount_call = &self.amount;
+            // // 有效动画帧间隔
+            // if group_info.start_event || self.detal_ms_record >= self.frame_ms * 0.75 || self.debug {
+            //     let amount_call = &self.amount;
     
-                let (mut amount, loop_count) = amount_call((self.once_time_ms - self.frame_ms * 0.5).max(self.frame_ms * 0.5), self.running_time_ms);
+            //     let (mut amount, loop_count) = amount_call((self.once_time_ms - self.frame_ms * 0.5).max(self.frame_ms * 0.5), self.running_time_ms);
 
-                if self.looped_count != loop_count {
-                    match self.loop_count {
-                        Some(count) => {
-                            if count <= loop_count {
-                                group_info.end_event = true;
-                                self.is_playing = false;
+            //     if self.looped_count != loop_count {
+            //         match self.loop_count {
+            //             Some(count) => {
+            //                 if count <= loop_count {
+            //                     group_info.end_event = true;
+            //                     self.is_playing = false;
 
-                                if (self.fill_mode.deref() & EFillMode::FORWARDS.deref()) == *EFillMode::FORWARDS.deref() {
-                                    amount = match self.loop_mode {
-                                        ELoopMode::Not => 1.,
-                                        ELoopMode::Positive(_) => 1.,
-                                        ELoopMode::Opposite(_) => 0.,
-                                        ELoopMode::PositivePly(_) => 0.,
-                                        ELoopMode::OppositePly(_) => 1.,
-                                    }
-                                }
-                            } else {
-                                group_info.loop_event = true;
-                            }
-                        },
-                        None => {
-                            group_info.loop_event = true;
-                        },
-                    }
-                }
+            //                     if (self.fill_mode.deref() & EFillMode::FORWARDS.deref()) == *EFillMode::FORWARDS.deref() {
+            //                         amount = match self.loop_mode {
+            //                             ELoopMode::Not => 1.,
+            //                             ELoopMode::Positive(_) => 1.,
+            //                             ELoopMode::Opposite(_) => 0.,
+            //                             ELoopMode::PositivePly(_) => 0.,
+            //                             ELoopMode::OppositePly(_) => 1.,
+            //                         }
+            //                     }
+            //                 } else {
+            //                     group_info.loop_event = true;
+            //                 }
+            //             },
+            //             None => {
+            //                 group_info.loop_event = true;
+            //             },
+            //         }
+            //     }
     
-                let anime_amount = self.amount_calc.calc(amount);
-                let amount_in_second = anime_amount * self.once_time_ms / (1000.0 as KeyFrameCurveValue) + self.from / Self::BASE_FPS as KeyFrameCurveValue;
+            //     let anime_amount = self.amount_calc.calc(amount);
+            //     let amount_in_second = anime_amount * self.once_time_ms / (1000.0 as KeyFrameCurveValue) + self.from / Self::BASE_FPS as KeyFrameCurveValue;
     
-                log::trace!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time_ms, self.running_time_ms, amount, anime_amount, amount_in_second);
+            //     log::trace!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time_ms, self.running_time_ms, amount, anime_amount, amount_in_second);
     
-                self.looped_count = loop_count;
-                self.amount_in_second = amount_in_second;
+            //     self.looped_count = loop_count;
+            //     self.amount_in_second = amount_in_second;
 
-                group_info.amount_in_second = amount_in_second;
-                group_info.looped_count = loop_count;
+            //     group_info.amount_in_second = amount_in_second;
+            //     group_info.looped_count = loop_count;
 
-                self.update_to_infos(runtime_infos);
+            //     self.update_to_infos(runtime_infos);
 
-                self.running_time_ms += self.detal_ms_record * self.speed;
-                self.detal_ms_record = 0.;
-            }
+            //     self.running_time_ms += self.detal_ms_record * self.speed;
+            //     self.detal_ms_record = 0.;
+            // }
+
+            
+            let mut _is_playing = self.is_playing;
+            let mut _running_delay_time_ms = self.running_delay_time_ms;
+            let mut _running_time_ms = self.running_time_ms;
+            let mut _looped_count = self.looped_count;
+            let mut _amount_in_second = self.amount_in_second;
+            let mut _detal_ms_record = self.detal_ms_record;
+
+            _anime(
+                &mut _is_playing, self.delay_time_ms, &mut _running_delay_time_ms, self.frame_ms, self.loop_mode, self.once_time_ms, self.from,
+                &mut _running_time_ms, &mut _looped_count, &self.amount_calc, self.speed, self.fill_mode, self.debug,
+                &self.amount, &self.loop_count, &mut _amount_in_second, &mut _detal_ms_record, delta_ms, group_info
+            );
+
+            self.is_playing = _is_playing;
+            self.running_delay_time_ms = _running_delay_time_ms;
+            self.running_time_ms = _running_time_ms;
+            self.looped_count = _looped_count;
+            self.amount_in_second = _amount_in_second;
+            self.detal_ms_record = _detal_ms_record;
+            self.update_to_infos(runtime_infos);
         }
     }
     /// 添加 目标动画
@@ -458,5 +483,107 @@ impl<T: Clone + PartialEq + Eq + Hash> TAnimatableTargetModifier<f32> for Animat
             self.blend_weight = value;
         }
         Ok(())
+    }
+}
+
+
+fn _anime(
+    _is_playing: &mut bool,
+    delay_time_ms: TimeMS,
+    _running_delay_time_ms: &mut TimeMS,
+    frame_ms: TimeMS,
+    loop_mode: ELoopMode,
+    once_time_ms: TimeMS,
+    from: KeyFrameCurveValue,
+    _running_time_ms: &mut TimeMS,
+    _looped_count: &mut u32,
+    amount_calc: &AnimationAmountCalc,
+    speed: KeyFrameCurveValue,
+    fill_mode: EFillMode,
+    debug: bool,
+    amount: &fn(f32, f32) -> (f32, u32),
+
+    _loop_count: &Option<u32>,
+    _amount_in_second: &mut KeyFrameCurveValue,
+    _detal_ms_record: &mut TimeMS,
+
+    delta_ms: KeyFrameCurveValue,
+    group_info: &mut AnimationGroupRuntimeInfo,
+) {
+    // 延时未结束
+    if delay_time_ms - *_running_delay_time_ms > frame_ms * 0.75 {
+        *_running_delay_time_ms += delta_ms;
+        if (fill_mode.deref() & EFillMode::BACKWARDS.deref()) == *EFillMode::BACKWARDS.deref() {
+            let anime_amount = match loop_mode {
+                ELoopMode::Not => 0.,
+                ELoopMode::Positive(_) => 0.,
+                ELoopMode::Opposite(_) => 1.,
+                ELoopMode::PositivePly(_) => 0.,
+                ELoopMode::OppositePly(_) => 1.,
+            };
+            let amount_in_second = anime_amount * once_time_ms / (1000.0 as KeyFrameCurveValue) + from / BASE_FPS as KeyFrameCurveValue;
+            *_amount_in_second = amount_in_second;
+            group_info.amount_in_second = amount_in_second;
+
+            // self.update_to_infos(runtime_infos);
+        }
+        return;
+    }
+
+    // 正常运行
+    if _running_time_ms.abs() < 0.001 {
+        group_info.start_event = true;
+    }
+
+    *_detal_ms_record += delta_ms;
+    // log::trace!(">>>>>>>>>>>>>>>> detal_ms_record {}, frame_ms {}", self.detal_ms_record, self.frame_ms);
+
+    // 有效动画帧间隔
+    if group_info.start_event || *_detal_ms_record >= frame_ms * 0.75 || debug {
+        let amount_call = amount;
+
+        let (mut amount, loop_count) = amount_call((once_time_ms - frame_ms * 0.5).max(frame_ms * 0.5), *_running_time_ms);
+
+        if *_looped_count != loop_count {
+            match _loop_count {
+                Some(count) => {
+                    if *count <= loop_count {
+                        group_info.end_event = true;
+                        *_is_playing = false;
+
+                        if (fill_mode.deref() & EFillMode::FORWARDS.deref()) == *EFillMode::FORWARDS.deref() {
+                            amount = match loop_mode {
+                                ELoopMode::Not => 1.,
+                                ELoopMode::Positive(_) => 1.,
+                                ELoopMode::Opposite(_) => 0.,
+                                ELoopMode::PositivePly(_) => 0.,
+                                ELoopMode::OppositePly(_) => 1.,
+                            }
+                        }
+                    } else {
+                        group_info.loop_event = true;
+                    }
+                },
+                None => {
+                    group_info.loop_event = true;
+                },
+            }
+        }
+
+        let anime_amount = amount_calc.calc(amount);
+        let amount_in_second = anime_amount * once_time_ms / (1000.0 as KeyFrameCurveValue) + from / BASE_FPS as KeyFrameCurveValue;
+
+        // log::trace!("once_time {}, delay_time {}, amount {}, anime_amount {}, amount_in_second {}", self.once_time_ms, self.running_time_ms, amount, anime_amount, amount_in_second);
+
+        *_looped_count = loop_count;
+        *_amount_in_second = amount_in_second;
+
+        group_info.amount_in_second = amount_in_second;
+        group_info.looped_count = loop_count;
+
+        *_running_time_ms += *_detal_ms_record * speed;
+        *_detal_ms_record = 0.;
+
+        // self.update_to_infos(runtime_infos);
     }
 }
