@@ -87,9 +87,9 @@ impl<F: FrameDataValue, D: AsRef<FrameCurve<F>>> TypeAnimationContext<F, D> {
         let (result, index) = _create_animation(self.ty, &mut self.id_pool, curve_info, attr, self.curves.len());
         
         if index == self.curves.len() {
-            self.curves[index] = Some(curve);
-        } else {
             self.curves.push(Some(curve));
+        } else {
+            self.curves[index] = Some(curve);
         }
         result
 
