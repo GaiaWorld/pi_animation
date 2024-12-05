@@ -1,6 +1,6 @@
 [package]
 name = "pi_animation"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["baip0002 <bai9253461@gmail.com>", "bp0002 <bp950722@outlook.com>"]
 edition = "2021"
 description = "Animation Runtime Library"

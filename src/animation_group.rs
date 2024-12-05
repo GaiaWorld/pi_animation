@@ -256,6 +256,47 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
             self.update_to_infos(runtime_infos);
         }
     }
+    pub fn goto_progress(
+        &self,
+        amount: KeyFrameCurveValue,
+        runtime_infos: &mut RuntimeInfoMap<T>,
+        group_info: &mut AnimationGroupRuntimeInfo
+    ) {
+        group_info.last_amount_in_second = group_info.amount_in_second;
+
+        let mut _is_playing = self.is_playing;
+        let mut _running_delay_time_ms = self.running_delay_time_ms;
+        let mut _running_time_ms = self.running_time_ms;
+        let mut _looped_count = self.looped_count;
+        let mut _amount_in_second = self.amount_in_second;
+        let mut _detal_ms_record = self.detal_ms_record;
+
+        {
+            let anime_amount = self.amount_calc.calc(amount);
+            let amount_in_second = anime_amount * self.once_time_ms + self.from / BASE_FPS as KeyFrameCurveValue;
+
+            let loop_count = 0;
+            _looped_count = loop_count;
+            _amount_in_second = amount_in_second;
+    
+            group_info.amount_in_second = amount_in_second;
+            group_info.looped_count = loop_count;
+    
+            _running_time_ms += 0.;
+            _detal_ms_record = 0.;
+        }
+
+        self._update_to_infos(runtime_infos, _amount_in_second);
+    }
+    pub fn goto_frame(
+        &self,
+        frame: KeyFrameCurveValue,
+        runtime_infos: &mut RuntimeInfoMap<T>,
+        group_info: &mut AnimationGroupRuntimeInfo
+    ) {
+        let amount = (frame - self.from).abs() / (self.to - self.from).abs().min(1.).max(0.);
+        self.goto_progress(amount, runtime_infos, group_info);
+    }
     /// 添加 目标动画
     pub fn add_target_animation(
         &mut self,
@@ -264,6 +305,7 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
         // println!("{}", self.max_frame);
         self.max_frame = KeyFrameCurveValue::max(self.max_frame, target_animation.animation.get_max_frame_for_running_speed(Self::BASE_FPS));
         // println!("add_target_animation {}", self.max_frame);
+        self.to = self.max_frame;
         self.animations.push(target_animation);
         Ok(())
     }
@@ -440,6 +482,30 @@ impl<T: Clone + PartialEq + Eq + Hash> AnimationGroup<T> {
                 //     is_playing: self.is_playing,
                 // },
                 amount_in_second: self.amount_in_second,
+                // anime: *anime,
+                // target: anime.target.clone(),
+                attr: anime.animation.attr(),
+                curve_id: anime.animation.curve_id(),
+                group_weight: self.blend_weight,
+                amount_calc: self.amount_calc_between_frame.clone()
+            };
+            let _ = runtime_infos.insert(anime.animation.ty(), anime.target.clone(), temp);
+        }
+    }
+    fn _update_to_infos(
+        &self,
+        runtime_infos: &mut RuntimeInfoMap<T>,
+        amount_in_second: KeyFrameCurveValue,
+    ) {
+        for anime in self.animations.iter() {
+            let temp = RuntimeInfo {
+                // group_info: AnimationGroupRuntimeInfo {
+                //     amount_in_second: self.amount_in_second,
+                //     loop_count: self.loop_count,
+                //     is_loop: self.is_loop,
+                //     is_playing: self.is_playing,
+                // },
+                amount_in_second,
                 // anime: *anime,
                 // target: anime.target.clone(),
                 attr: anime.animation.attr(),
