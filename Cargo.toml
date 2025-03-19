@@ -1,6 +1,6 @@
 [package]
 name = "pi_animation"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["baip0002 <bai9253461@gmail.com>", "bp0002 <bp950722@outlook.com>"]
 edition = "2021"
 description = "Animation Runtime Library"
@@ -12,7 +12,7 @@ keywords = ["pi", "animation", "target animation", "attribute animation"]
 log         = "0.4"
 serde       = { version = "1.0", features = ["derive"], option=true }
 pi_hash     = "0.1"
-pi_slotmap  = "0.1"
+pi_slotmap  = "0.2"
 pi_null     = "0.1"
 
 pi_curves   = { version = "*", registry = "yn"}
@@ -21,4 +21,4 @@ pi_curves   = { version = "*", registry = "yn"}
 env_logger  = "0.9"
 
 [patch.yn]
-pi_curves   = { path = "../pi_curves"}
+# pi_curves   = { path = "../pi_curves"}
